@@ -323,7 +323,18 @@ function updateFavBadgeCount() {
 // 5. 단어 리스트 렌더링 함수
 function renderWordList() {
     const listContainer = document.getElementById('word-cards-list');
-    listContainer.innerHTML = '';
+    const leftCol = document.getElementById('word-list-left');
+    const rightCol = document.getElementById('word-list-right');
+
+    // 컬럼 내용만 초기화 (컬럼 자체는 유지)
+    leftCol.innerHTML = '';
+    rightCol.innerHTML = '';
+    
+    // 기존에 존재하던 결과 없음 메시지가 있다면 제거
+    const existingNoResults = listContainer.querySelector('.no-results');
+    if (existingNoResults) {
+        existingNoResults.remove();
+    }
 
     // 필터링 적용
     let filtered = WORD_DATABASE.filter(item => {
@@ -389,18 +400,25 @@ function renderWordList() {
 
     // 결과가 없는 경우 처리
     if (filtered.length === 0) {
-        listContainer.innerHTML = `
-            <div class="no-results">
-                <svg class="no-results-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="8" y1="12" x2="16" y2="12"></line></svg>
-                <h4>검색된 한방단어가 없습니다.</h4>
-                <p>다른 첫 글자를 검색하거나 초성 퀵 필터를 선택해 보세요.</p>
-            </div>
+        leftCol.style.display = 'none';
+        rightCol.style.display = 'none';
+        
+        const noResults = document.createElement('div');
+        noResults.className = 'no-results';
+        noResults.innerHTML = `
+            <svg class="no-results-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+            <h4>검색된 한방단어가 없습니다.</h4>
+            <p>다른 첫 글자를 검색하거나 초성 퀵 필터를 선택해 보세요.</p>
         `;
+        listContainer.appendChild(noResults);
         return;
+    } else {
+        leftCol.style.display = 'flex';
+        rightCol.style.display = 'flex';
     }
 
     // 카드 생성 및 주입
-    filtered.forEach(item => {
+    filtered.forEach((item, index) => {
         const isFav = favorites.includes(item.word);
         const card = document.createElement('div');
         card.className = `word-card glass-panel tier-${item.tier}`;
@@ -435,24 +453,33 @@ function renderWordList() {
                     </div>
                 </div>
                 <div class="card-actions-top">
+                    <button class="icon-btn icon-copy-btn" data-word="${item.word}" title="단어 복사">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    </button>
                     <button class="icon-btn fav-btn ${isFav ? 'active' : ''}" data-word="${item.word}" title="즐겨찾기 토글">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${isFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
                     </button>
+                    <button class="icon-btn fold-toggle-btn" title="상세 보기 접기/펴기">
+                        <svg class="chevron-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
                 </div>
             </div>
-            <p class="word-def">${item.definition}</p>
-            <div class="card-footer">
-                <div class="power-stars" title="공격 위력 별점: ${item.tier}성">
-                    ${starsHtml}
+            <div class="card-details-collapsible">
+                <p class="word-def">${item.definition}</p>
+                <div class="card-footer">
+                    <div class="power-stars" title="공격 위력 별점: ${item.tier}성">
+                        ${starsHtml}
+                    </div>
                 </div>
-                <button class="copy-btn" data-word="${item.word}">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                    복사
-                </button>
             </div>
         `;
         
-        listContainer.appendChild(card);
+        // 홀수/짝수 인덱스 배분으로 Masonry 효과 생성
+        if (index % 2 === 0) {
+            leftCol.appendChild(card);
+        } else {
+            rightCol.appendChild(card);
+        }
     });
 
     // 이벤트 리스너 재바인딩
@@ -461,6 +488,16 @@ function renderWordList() {
 
 // 6. 단어 카드 내부 버튼 이벤트 연결
 function bindCardEvents() {
+    // 카드 자체 클릭 시 접기/펴기 토글 (단, 버튼 클릭 시에는 제외)
+    document.querySelectorAll('.word-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+            if (e.target.closest('.icon-copy-btn') || e.target.closest('.fav-btn')) {
+                return;
+            }
+            card.classList.toggle('expanded');
+        });
+    });
+
     // 즐겨찾기 버튼 클릭
     document.querySelectorAll('.fav-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -486,7 +523,7 @@ function bindCardEvents() {
     });
 
     // 복사 버튼 클릭
-    document.querySelectorAll('.copy-btn').forEach(btn => {
+    document.querySelectorAll('.icon-copy-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const word = btn.getAttribute('data-word');
