@@ -146,6 +146,17 @@
         <p>&copy; 2026 끝말잇기 필승 연구소. 모든 단어는 표준국어대사전 및 주요 온라인 게임 사전을 참고하였습니다.</p>
     </footer>
 
+    <!-- Mobile Floating Action Button -->
+    <button id="mobile-nav-fab" class="mobile-fab" aria-label="이동 버튼">
+        <span class="fab-icon-wrapper">
+            <!-- Down/Analyzer Icon (Default) -->
+            <svg class="fab-icon icon-to-analyzer" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            <!-- Up/Search Icon (Toggled) -->
+            <svg class="fab-icon icon-to-search hidden" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </span>
+        <span id="fab-text">분석기</span>
+    </button>
+
     <script src="app.js"></script>
 </body>
 </html>

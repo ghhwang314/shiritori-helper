@@ -862,6 +862,59 @@ function initEvents() {
             analyzeWord();
         }
     });
+
+    // 모바일 플로팅 버튼(FAB) 관련 로직
+    const navFab = document.getElementById('mobile-nav-fab');
+    if (navFab) {
+        const toAnalyzerIcon = navFab.querySelector('.icon-to-analyzer');
+        const toSearchIcon = navFab.querySelector('.icon-to-search');
+        const fabText = document.getElementById('fab-text');
+        
+        let isAtBottom = false;
+
+        // 스크롤 위치 감지하여 FAB 아이콘/텍스트 토글
+        window.addEventListener('scroll', () => {
+            const searchInput = document.getElementById('word-search-input');
+            const analyzerCard = document.querySelector('.sidebar-section');
+            if (!searchInput || !analyzerCard) return;
+
+            const rect = analyzerCard.getBoundingClientRect();
+            // 분석기 카드 영역이 화면 뷰포트에 70% 이상 보이기 시작하면 모드 전환
+            if (rect.top < window.innerHeight * 0.7) {
+                if (!isAtBottom) {
+                    isAtBottom = true;
+                    toAnalyzerIcon.classList.add('hidden');
+                    toSearchIcon.classList.remove('hidden');
+                    fabText.textContent = '검색창';
+                }
+            } else {
+                if (isAtBottom) {
+                    isAtBottom = false;
+                    toSearchIcon.classList.add('hidden');
+                    toAnalyzerIcon.classList.remove('hidden');
+                    fabText.textContent = '분석기';
+                }
+            }
+        });
+
+        navFab.addEventListener('click', () => {
+            if (isAtBottom) {
+                // 검색창으로 스크롤 및 포커스
+                const searchInput = document.getElementById('word-search-input');
+                if (searchInput) {
+                    searchInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    searchInput.focus();
+                }
+            } else {
+                // 분석기로 스크롤 및 포커스
+                const analyzerInput = document.getElementById('analyzer-input');
+                if (analyzerInput) {
+                    analyzerInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    analyzerInput.focus();
+                }
+            }
+        });
+    }
 }
 
 // 12. 초기 실행

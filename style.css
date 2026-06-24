@@ -1041,11 +1041,202 @@ body {
     transform: rotate(360deg);
 }
 
+/* 모바일 최적화 미디어 쿼리 (태블릿 및 모바일 기기) */
 @media (max-width: 768px) {
+    .container {
+        padding: 1.25rem 0.75rem;
+        gap: 1.25rem;
+    }
+
     .github-corner-link {
         position: static;
-        margin: 1rem auto 0 auto;
+        margin: 0.5rem auto 0 auto;
         width: fit-content;
+    }
+
+    /* 헤더 축소 */
+    .app-header {
+        margin-bottom: 0.25rem;
+    }
+    
+    .logo-area {
+        gap: 0.35rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .logo-badge {
+        font-size: 0.65rem;
+        padding: 0.15rem 0.5rem;
+    }
+    
+    .app-header h1 {
+        font-size: 1.85rem;
+    }
+    
+    .subtitle {
+        font-size: 0.85rem;
+        padding: 0 0.5rem;
+    }
+
+    /* 검색 섹션 컴팩트화 */
+    .search-section {
+        padding: 1.25rem 1rem;
+        gap: 1rem;
+    }
+
+    #word-search-input {
+        padding: 0.95rem 3rem;
+        font-size: 1rem;
+    }
+
+    .search-icon {
+        left: 1rem;
+        width: 1.2rem;
+        height: 1.2rem;
+    }
+
+    .clear-btn {
+        right: 1rem;
+    }
+
+    /* 초성 가로 스크롤 레이아웃 */
+    .quick-consonants-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+        width: 100%;
+    }
+
+    .consonant-grid {
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        width: 100%;
+        gap: 0.4rem;
+        padding-bottom: 0.6rem;
+        margin-bottom: -0.2rem;
+        scrollbar-width: none;
+    }
+
+    .consonant-grid::-webkit-scrollbar {
+        display: none;
+    }
+
+    .consonant-btn {
+        flex-shrink: 0;
+        padding: 0.45rem 0.85rem;
+        font-size: 0.85rem;
+    }
+
+    /* 단어 탐색기 레이아웃 조정 */
+    .section-header-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+
+    .tabs {
+        width: 100%;
+        gap: 0.5rem;
+    }
+
+    .tab-btn {
+        flex: 1;
+        justify-content: center;
+        padding: 0.65rem 0.5rem;
+        font-size: 0.95rem;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        border-radius: 8px;
+    }
+
+    .tab-btn.active {
+        background: rgba(139, 92, 246, 0.08);
+        border-color: rgba(139, 92, 246, 0.2);
+    }
+
+    .tab-btn.active::after {
+        display: none; /* 하단 줄 대신 배경 및 보더로 구분 */
+    }
+
+    .sorting-controls {
+        width: 100%;
+    }
+
+    .custom-select {
+        width: 100%;
+        text-align: center;
+        background-position: right 1rem center;
+        padding: 0.55rem 1rem;
+    }
+
+    /* 모바일 이중 스크롤 방지 및 스크롤 개선 */
+    .word-list-container {
+        max-height: none;
+        overflow-y: visible;
+        padding-right: 0;
+    }
+
+    /* 토스트 팝업 모바일 최적화 */
+    .toast {
+        bottom: 5.5rem;
+        width: 90%;
+        max-width: 320px;
+        justify-content: center;
+    }
+
+    /* 터치 피드백 강화 */
+    .word-card {
+        padding: 0.85rem 1rem;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .word-card:active {
+        background: rgba(15, 23, 42, 0.65);
+    }
+
+    /* 모바일 플로팅 버튼(FAB) 활성화 */
+    .mobile-fab {
+        position: fixed;
+        bottom: 2rem;
+        right: 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.15rem;
+        background: linear-gradient(135deg, var(--accent-purple), #7c3aed);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 50px;
+        color: #ffffff;
+        font-size: 0.85rem;
+        font-weight: 700;
+        cursor: pointer;
+        z-index: 999;
+        box-shadow: 0 8px 25px rgba(124, 58, 237, 0.5);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        -webkit-tap-highlight-color: transparent;
+    }
+    
+    .mobile-fab:active {
+        transform: scale(0.95);
+        box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
+    }
+
+    .fab-icon-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .fab-icon {
+        width: 1.1rem;
+        height: 1.1rem;
+    }
+
+    .fab-icon.hidden {
+        display: none;
     }
 }
 
