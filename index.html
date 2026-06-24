@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>끝말잇기 필승! 한방단어 검색기</title>
+    <meta name="description" content="첫 글자를 입력하면 상대방이 절대로 방어할 수 없는 끝말잇기 한방단어를 알려주는 필승 비법 사전">
+    <!-- Google Fonts: Outfit & Noto Sans KR -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-background"></div>
+    <div class="glow-orb orb-1"></div>
+    <div class="glow-orb orb-2"></div>
+
+    <div class="container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo-area">
+                <span class="logo-badge">VICTORY</span>
+                <h1>끝말잇기 <span>한방단어 검색기</span></h1>
+            </div>
+            <p class="subtitle">첫 글자를 입력하면 상대를 침묵시키는 필승 한방단어(공격단어)를 알려줍니다.</p>
+        </header>
+
+        <!-- Search & Quick Filters -->
+        <section class="search-section glass-panel">
+            <div class="search-bar-wrapper">
+                <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="word-search-input" placeholder="첫 글자나 검색할 자음을 입력하세요 (예: 가, 나, ㄱ, ㄴ)..." autocomplete="off" autofocus>
+                <button id="clear-search-btn" class="clear-btn" aria-label="검색어 지우기">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            
+            <div class="quick-consonants-wrapper">
+                <span class="filter-label">초성 퀵 필터:</span>
+                <div class="consonant-grid" id="consonant-buttons">
+                    <button class="consonant-btn active" data-consonant="ALL">전체</button>
+                    <button class="consonant-btn" data-consonant="ㄱ">ㄱ</button>
+                    <button class="consonant-btn" data-consonant="ㄲ">ㄲ</button>
+                    <button class="consonant-btn" data-consonant="ㄴ">ㄴ</button>
+                    <button class="consonant-btn" data-consonant="ㄷ">ㄷ</button>
+                    <button class="consonant-btn" data-consonant="ㄸ">ㄸ</button>
+                    <button class="consonant-btn" data-consonant="ㄹ">ㄹ</button>
+                    <button class="consonant-btn" data-consonant="ㅁ">ㅁ</button>
+                    <button class="consonant-btn" data-consonant="ㅂ">ㅂ</button>
+                    <button class="consonant-btn" data-consonant="ㅃ">ㅃ</button>
+                    <button class="consonant-btn" data-consonant="ㅅ">ㅅ</button>
+                    <button class="consonant-btn" data-consonant="ㅆ">ㅆ</button>
+                    <button class="consonant-btn" data-consonant="ㅇ">ㅇ</button>
+                    <button class="consonant-btn" data-consonant="ㅈ">ㅈ</button>
+                    <button class="consonant-btn" data-consonant="ㅉ">ㅉ</button>
+                    <button class="consonant-btn" data-consonant="ㅊ">ㅊ</button>
+                    <button class="consonant-btn" data-consonant="ㅋ">ㅋ</button>
+                    <button class="consonant-btn" data-consonant="ㅌ">ㅌ</button>
+                    <button class="consonant-btn" data-consonant="ㅍ">ㅍ</button>
+                    <button class="consonant-btn" data-consonant="ㅎ">ㅎ</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Left Side: Word Explorer -->
+            <section class="word-explorer-section">
+                <div class="section-header-row">
+                    <div class="tabs">
+                        <button class="tab-btn active" id="tab-all-words">
+                            한방단어 목록
+                            <span class="count-badge" id="total-words-count">0</span>
+                        </button>
+                        <button class="tab-btn" id="tab-fav-words">
+                            즐겨찾기 
+                            <span class="count-badge" id="fav-words-count">0</span>
+                        </button>
+                    </div>
+                    <div class="sorting-controls">
+                        <select id="sort-select" class="custom-select">
+                            <option value="korean">가나다순</option>
+                            <option value="power-desc">공격력 높은순</option>
+                            <option value="power-asc">공격력 낮은순</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Word List Container -->
+                <div class="word-list-container scrollable-area" id="word-cards-list">
+                    <!-- Cards will be dynamically inserted here -->
+                </div>
+            </section>
+
+            <!-- Right Side: Sidebar Tools -->
+            <aside class="sidebar-section">
+                <!-- Tool 1: Analyzer -->
+                <div class="tool-card glass-panel">
+                    <div class="tool-header">
+                        <svg class="tool-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                        <h3>실시간 단어 분석기</h3>
+                    </div>
+                    <p class="tool-desc">끝말잇기 단어를 입력해 보세요. 끝글자가 어떤 수준의 공격력을 가졌는지 정밀 분석해 드립니다.</p>
+                    <div class="analyzer-form">
+                        <input type="text" id="analyzer-input" placeholder="분석할 단어를 입력하세요 (예: 나트륨)" autocomplete="off">
+                        <button id="analyze-btn" class="action-btn">분석하기</button>
+                    </div>
+                    <div id="analyzer-result-box" class="analyzer-result-box hidden">
+                        <!-- Result card will be injected here -->
+                    </div>
+                </div>
+
+                <!-- Tool 2: Rules Guide -->
+                <div class="tool-card glass-panel">
+                    <div class="tool-header">
+                        <svg class="tool-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                        <h3>끝글자 공격 도감 (공식 규칙)</h3>
+                    </div>
+                    <p class="tool-desc">어째서 이 글자들로 끝나면 한방단어가 될까요? 절대 방어 불가 1티어 끝글자들의 공격 공식입니다.</p>
+                    <div class="rules-list" id="rules-accordion">
+                        <!-- Accordion rules will be injected here -->
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- Toast Notification for Copying -->
+    <div id="toast-notification" class="toast hidden">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="toast-check-icon"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        <span id="toast-message">클립보드에 복사되었습니다!</span>
+    </div>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+        <p>&copy; 2026 끝말잇기 필승 연구소. 모든 단어는 표준국어대사전 및 주요 온라인 게임 사전을 참고하였습니다.</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
