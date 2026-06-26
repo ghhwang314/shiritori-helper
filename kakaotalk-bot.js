@@ -59,29 +59,71 @@ var ATTACK_RULES = {
 var WORD_DATABASE = null;
 var isDownloading = false;
 
-// 3. 데이터베이스 웹 로드 함수
+// 3. 웹 텍스트 다운로드 헬퍼 함수 (3중 백업 지원)
+function fetchWebText(urlStr) {
+    // 1단계 백업: Java 표준 URLConnection 사용 (엔진 종류 상관없이 100% 작동)
+    try {
+        var url = new java.net.URL(urlStr);
+        var conn = url.openConnection();
+        conn.setRequestMethod("GET");
+        conn.setConnectTimeout(8000);
+        conn.setReadTimeout(8000);
+        
+        var reader = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream(), "UTF-8"));
+        var line;
+        var result = "";
+        while ((line = reader.readLine()) !== null) {
+            result += line + "\n";
+        }
+        reader.close();
+        if (result && result.trim()) {
+            return result.trim();
+        }
+    } catch (e1) {
+        // 실패 시 다음 단계로 진행
+    }
+
+    // 2단계 백업: Jsoup 라이브러리 사용 (org 패키지가 존재할 경우)
+    try {
+        if (typeof org !== 'undefined' && org.jsoup && org.jsoup.Jsoup) {
+            var jsoupText = org.jsoup.Jsoup.connect(urlStr)
+                .ignoreContentType(true)
+                .maxBodySize(0)
+                .timeout(8000)
+                .execute()
+                .body();
+            if (jsoupText && jsoupText.trim()) {
+                return jsoupText.trim();
+            }
+        }
+    } catch (e2) {
+        // 실패 시 다음 단계로 진행
+    }
+
+    // 3단계 백업: 메신저봇R 내장 Utils 사용
+    try {
+        if (typeof Utils !== 'undefined' && Utils.getWebText) {
+            var utilsText = Utils.getWebText(urlStr);
+            if (utilsText && utilsText.trim()) {
+                return utilsText.trim();
+            }
+        }
+    } catch (e3) {
+        // 실패
+    }
+
+    return null;
+}
+
+// 4. 데이터베이스 웹 로드 함수
 function loadDatabase() {
     if (WORD_DATABASE && WORD_DATABASE.length > 0) return true;
     if (isDownloading) return false;
     
     isDownloading = true;
     try {
-        var jsonText = "";
-        try {
-            // 메신저봇R 내장 유틸리티 사용
-            jsonText = Utils.getWebText(DB_URL);
-        } catch (e) {
-            // JSoup 라이브러리 사용 백업
-            jsonText = org.jsoup.Jsoup.connect(DB_URL)
-                .ignoreContentType(true)
-                .maxBodySize(0)
-                .timeout(10000)
-                .execute()
-                .body();
-        }
-        
+        var jsonText = fetchWebText(DB_URL);
         if (jsonText) {
-            jsonText = jsonText.trim();
             WORD_DATABASE = JSON.parse(jsonText);
             isDownloading = false;
             return true;
