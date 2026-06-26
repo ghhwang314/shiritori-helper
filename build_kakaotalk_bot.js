@@ -18,13 +18,13 @@ try {
     fs.writeFileSync('words.json', JSON.stringify(wordDatabase, null, 2), 'utf8');
     console.log('words.json generated successfully.');
 
-    // Template for the bot script
+    // Template for the bot script (Fully ES5 compatible with escaped backslashes)
     const template = `/*
  * 끝말잇기 한방단어 카카오톡 봇 스크립트 (메신저봇R 전용 - 초경량 네트워크 버전)
  * 
  * 제작/제공: 끝말잇기 필승 연구소
  * 설명: 1.4MB의 데이터베이스를 기기 내부에 저장하지 않고, 깃허브 웹 서버에서 실시간으로 불러와 작동합니다.
- *       코드 크기가 매우 작아(10KB 이하) 휴대폰 복사 및 붙여넣기가 매우 수월합니다.
+ *       구형 스마트폰(Rhino 엔진)과의 호환성을 위해 100% ES5 표준 문법으로 작성되었습니다.
  * 
  * 사용법: 카카오톡 채팅방에서 아래 명령어를 입력하세요.
  *   - /도움말 또는 !도움말 : 사용법 및 명령어 목록 확인
@@ -36,14 +36,14 @@ try {
  */
 
 // 데이터베이스 URL (GitHub Pages에 배포된 JSON 파일)
-const DB_URL = "https://ghhwang314.github.io/shiritori-helper/words.json";
+var DB_URL = "https://ghhwang314.github.io/shiritori-helper/words.json";
 
 // 1. 공격 끝글자 규칙 데이터베이스
-const ATTACK_RULES = ${attackRulesText}
+var ATTACK_RULES = ${attackRulesText}
 
 // 2. 전역 캐시 변수
-let WORD_DATABASE = null;
-let isDownloading = false;
+var WORD_DATABASE = null;
+var isDownloading = false;
 
 // 3. 데이터베이스 웹 로드 함수
 function loadDatabase() {
@@ -52,7 +52,7 @@ function loadDatabase() {
     
     isDownloading = true;
     try {
-        let jsonText = "";
+        var jsonText = "";
         try {
             // 메신저봇R 내장 유틸리티 사용
             jsonText = Utils.getWebText(DB_URL);
@@ -85,22 +85,28 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
     msg = msg.trim();
     if (!msg.startsWith('/') && !msg.startsWith('!')) return;
     
-    const prefix = msg.charAt(0);
-    const commandLine = msg.substring(1).trim();
-    const spaceIndex = commandLine.indexOf(' ');
+    var prefix = msg.charAt(0);
+    var commandLine = msg.substring(1).trim();
+    var spaceIndex = commandLine.indexOf(' ');
     
-    let command = commandLine;
-    let parameter = '';
+    var command = commandLine;
+    var parameter = '';
     if (spaceIndex !== -1) {
         command = commandLine.substring(0, spaceIndex).trim();
         parameter = commandLine.substring(spaceIndex + 1).trim();
     }
     
-    // 전체보기 유니코드 문자열 (채팅방 도배 방지용)
-    const readMore = "\\u200b".repeat(500);
+    // 전체보기 유니코드 문자열 (채팅방 도배 방지용 - ES5 루프로 생성)
+    var readMore = (function() {
+        var str = "";
+        for (var i = 0; i < 500; i++) {
+            str += "\\u200b";
+        }
+        return str;
+    })();
     
     if (command === '도움말' || command === 'help') {
-        const helpMsg = [
+        var helpMsg = [
             "🏆 [끝말잇기 필승 봇 도움말]",
             "끝말잇기 방어 불가 한방단어를 알려주는 비법 비서봇입니다.",
             "",
@@ -133,7 +139,7 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
     else {
         // 단어 데이터베이스 로딩 시도
         if (!WORD_DATABASE || WORD_DATABASE.length === 0) {
-            const success = loadDatabase();
+            var success = loadDatabase();
             if (!success) {
                 replier.reply("⚠️ 단어 데이터베이스를 불러오는 중입니다. 잠시 후 다시 명령어를 입력해 주세요. (혹은 " + prefix + "업데이트 입력)");
                 return;
@@ -146,26 +152,29 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
                 return;
             }
             
-            const query = parameter.toLowerCase();
-            const results = filterWords(query);
+            var query = parameter.toLowerCase();
+            var results = filterWords(query);
             
             if (results.length === 0) {
                 replier.reply("❌ '" + parameter + "'에 매칭되는 한방단어를 찾지 못했습니다.");
                 return;
             }
             
-            // 정렬 (티어 내림차순, 그 다음 가나다순)
-            results.sort((a, b) => {
+            // 정렬 (티어 내림차순, 그 다음 가나다순 - ES5)
+            results.sort(function(a, b) {
                 if (b.tier !== a.tier) return b.tier - a.tier;
-                return a.word.localeCompare(b.word, 'ko');
+                return a.word > b.word ? 1 : (a.word < b.word ? -1 : 0);
             });
             
-            let title = "🔍 [한방단어 검색 결과]\\n";
+            var title = "🔍 [한방단어 검색 결과]\\n";
             title += "'" + parameter + "' 검색 결과 (총 " + results.length + "개):";
             
-            let body = "\\n" + readMore + "\\n";
-            results.forEach((item, idx) => {
-                let tierStar = "⭐".repeat(item.tier);
+            var body = "\\n" + readMore + "\\n";
+            results.forEach(function(item, idx) {
+                var tierStar = "";
+                for (var s = 0; s < item.tier; s++) {
+                    tierStar += "⭐";
+                }
                 body += (idx + 1) + ". " + item.word + " (" + getTierName(item.tier) + " " + tierStar + ")\\n";
                 body += "   뜻: " + item.definition + "\\n\\n";
             });
@@ -179,19 +188,22 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
                 return;
             }
             
-            const word = parameter;
-            const koreanRegex = /^[가-힣]+$/;
+            var word = parameter;
+            var koreanRegex = /^[가-힣]+$/;
             if (!koreanRegex.test(word)) {
                 replier.reply("⚠️ 한글로만 이루어진 단어를 입력해 주세요.");
                 return;
             }
             
-            const lastChar = word.slice(-1);
-            const rule = ATTACK_RULES[lastChar];
+            var lastChar = word.slice(-1);
+            var rule = ATTACK_RULES[lastChar];
             
-            let replyMsg = "🧐 [" + word + "] 실시간 공격력 분석\\n\\n";
+            var replyMsg = "🧐 [" + word + "] 실시간 공격력 분석\\n\\n";
             if (rule) {
-                let tierStar = "⭐".repeat(rule.tier);
+                var tierStar = "";
+                for (var s = 0; s < rule.tier; s++) {
+                    tierStar += "⭐";
+                }
                 replyMsg += "▶ 마지막 글자: [" + lastChar + "]\\n";
                 replyMsg += "▶ 판정 등급: " + rule.name + " (" + tierStar + ")\\n";
                 replyMsg += "▶ 상세 분석: " + rule.desc + "\\n\\n";
@@ -207,36 +219,47 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
         
         else if (command === '도감') {
             if (parameter) {
-                const char = parameter.trim();
-                const rule = ATTACK_RULES[char];
+                var char = parameter.trim();
+                var rule = ATTACK_RULES[char];
                 if (!rule) {
                     replier.reply("❌ '" + char + "'은(는) 등록된 한방 공격 끝글자가 아닙니다.");
                     return;
                 }
-                let tierStar = "⭐".repeat(rule.tier);
-                let msgOut = "📖 [한방 끝글자 도감 - " + char + "]\\n\\n";
+                var tierStar = "";
+                for (var s = 0; s < rule.tier; s++) {
+                    tierStar += "⭐";
+                }
+                var msgOut = "📖 [한방 끝글자 도감 - " + char + "]\\n\\n";
                 msgOut += "▶ 공격 등급: " + rule.name + " (" + tierStar + ")\\n";
                 msgOut += "▶ 분석 설명: " + rule.desc + "\\n\\n";
                 
-                const examples = WORD_DATABASE.filter(w => w.endChar === char).map(w => w.word);
+                var examples = [];
+                for (var e = 0; e < WORD_DATABASE.length; e++) {
+                    if (WORD_DATABASE[e].endChar === char) {
+                        examples.push(WORD_DATABASE[e].word);
+                    }
+                }
                 if (examples.length > 0) {
                     msgOut += "💡 대표 예시 단어: " + examples.slice(0, 8).join(', ');
                 }
                 replier.reply(msgOut);
             } else {
                 // 전체 도감 목록 출력
-                let title = "📖 [끝글자 공격 도감 전체 목록]";
-                let body = "\\n" + readMore + "\\n";
+                var title = "📖 [끝글자 공격 도감 전체 목록]";
+                var body = "\\n" + readMore + "\\n";
                 
-                const sortedRules = Object.keys(ATTACK_RULES).map(key => {
-                    return { key, rule: ATTACK_RULES[key] };
-                }).sort((a, b) => {
+                var sortedRules = Object.keys(ATTACK_RULES).map(function(key) {
+                    return { key: key, rule: ATTACK_RULES[key] };
+                }).sort(function(a, b) {
                     if (b.rule.tier !== a.rule.tier) return b.rule.tier - a.rule.tier;
-                    return a.key.localeCompare(b.key, 'ko');
+                    return a.key > b.key ? 1 : (a.key < b.key ? -1 : 0);
                 });
                 
-                sortedRules.forEach(item => {
-                    let tierStar = "⭐".repeat(item.rule.tier);
+                sortedRules.forEach(function(item) {
+                    var tierStar = "";
+                    for (var s = 0; s < item.rule.tier; s++) {
+                        tierStar += "⭐";
+                    }
                     body += "[" + item.key + "] - " + item.rule.name + " (" + tierStar + ")\\n";
                     body += "설명: " + item.rule.desc + "\\n\\n";
                 });
@@ -245,13 +268,18 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
         }
         
         else if (command === '추천') {
-            // 랜덤으로 3개 단어 추출
-            const shuffled = WORD_DATABASE.slice().sort(() => 0.5 - Math.random());
-            const selected = shuffled.slice(0, 3);
+            // 랜덤으로 3개 단어 추출 (ES5)
+            var shuffled = WORD_DATABASE.slice().sort(function() {
+                return 0.5 - Math.random();
+            });
+            var selected = shuffled.slice(0, 3);
             
-            let msgOut = "🎲 [오늘의 추천 필승 한방단어]\\n\\n";
-            selected.forEach((item, idx) => {
-                let tierStar = "⭐".repeat(item.tier);
+            var msgOut = "🎲 [오늘의 추천 필승 한방단어]\\n\\n";
+            selected.forEach(function(item, idx) {
+                var tierStar = "";
+                for (var s = 0; s < item.tier; s++) {
+                    tierStar += "⭐";
+                }
                 msgOut += (idx + 1) + ". " + item.word + " (" + getTierName(item.tier) + " " + tierStar + ")\\n";
                 msgOut += "   뜻: " + item.definition + "\\n\\n";
             });
@@ -261,25 +289,25 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
 }
 
 // --- 헬퍼 함수 및 데이터 추출 알고리즘 ---
-const HANGUL_START = 0xAC00;
-const HANGUL_END = 0xD7A3;
-const CHOSUNG_LIST = [
+var HANGUL_START = 0xAC00;
+var HANGUL_END = 0xD7A3;
+var CHOSUNG_LIST = [
     'ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 
     'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'
 ];
 
 function getChosung(char) {
-    const code = char.charCodeAt(0);
+    var code = char.charCodeAt(0);
     if (code >= HANGUL_START && code <= HANGUL_END) {
-        const index = Math.floor((code - HANGUL_START) / 588);
+        var index = Math.floor((code - HANGUL_START) / 588);
         return CHOSUNG_LIST[index];
     }
     return char;
 }
 
 function filterWords(searchQuery) {
-    return WORD_DATABASE.filter(item => {
-        const firstChar = item.word.charAt(0);
+    return WORD_DATABASE.filter(function(item) {
+        var firstChar = item.word.charAt(0);
         
         // 검색어가 초성 한 글자인 경우
         if (searchQuery.length === 1 && CHOSUNG_LIST.indexOf(searchQuery) !== -1) {
@@ -302,7 +330,7 @@ function getTierName(tier) {
 `;
 
     fs.writeFileSync('kakaotalk-bot.js', template, 'utf8');
-    console.log('kakaotalk-bot.js (Lightweight Network Version) generated successfully.');
+    console.log('kakaotalk-bot.js (ES5 Fully Compatible Version - Escaped) generated successfully.');
 } catch (err) {
     console.error('Error generating bot script:', err);
     process.exit(1);
