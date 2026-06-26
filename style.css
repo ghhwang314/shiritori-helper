@@ -1240,3 +1240,43 @@ body {
     }
 }
 
+/* 더 보기 버튼 스타일 */
+.load-more-wrapper {
+    display: flex;
+    justify-content: center;
+    margin-top: 1.5rem;
+    margin-bottom: 1.5rem;
+    width: 100%;
+}
+
+.load-more-btn {
+    width: 100%;
+    max-width: 400px;
+    padding: 0.95rem 1.5rem;
+    background: rgba(139, 92, 246, 0.08);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    border-radius: 12px;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    text-align: center;
+}
+
+.load-more-btn:hover {
+    background: linear-gradient(135deg, var(--accent-purple), #7c3aed);
+    border-color: var(--accent-purple);
+    box-shadow: 0 8px 25px rgba(139, 92, 246, 0.4);
+    transform: translateY(-2px);
+    color: #ffffff;
+}
+
+.load-more-btn:active {
+    transform: scale(0.98);
+}
+
+
