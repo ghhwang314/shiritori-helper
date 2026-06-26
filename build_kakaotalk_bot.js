@@ -12,28 +12,74 @@ try {
     // Extract WORD_DATABASE
     const dbMatch = appCode.match(/const WORD_DATABASE = (\[[\s\S]*?\n\];)/);
     if (!dbMatch) throw new Error('WORD_DATABASE not found');
-    const wordDbText = dbMatch[1];
+    
+    // Parse the database array to output clean JSON
+    const wordDatabase = eval(dbMatch[1]);
+    fs.writeFileSync('words.json', JSON.stringify(wordDatabase, null, 2), 'utf8');
+    console.log('words.json generated successfully.');
 
     // Template for the bot script
     const template = `/*
- * 끝말잇기 한방단어 카카오톡 봇 스크립트 (메신저봇R 및 레거시 API 전용)
+ * 끝말잇기 한방단어 카카오톡 봇 스크립트 (메신저봇R 전용 - 초경량 네트워크 버전)
  * 
  * 제작/제공: 끝말잇기 필승 연구소
+ * 설명: 1.4MB의 데이터베이스를 기기 내부에 저장하지 않고, 깃허브 웹 서버에서 실시간으로 불러와 작동합니다.
+ *       코드 크기가 매우 작아(10KB 이하) 휴대폰 복사 및 붙여넣기가 매우 수월합니다.
+ * 
  * 사용법: 카카오톡 채팅방에서 아래 명령어를 입력하세요.
  *   - /도움말 또는 !도움말 : 사용법 및 명령어 목록 확인
  *   - /검색 <자음/글자/단어> : 한방단어 검색 (예: !검색 ㄱ, !검색 가)
  *   - /분석 <단어> : 입력한 단어의 끝글자 공격력 분석 (예: !분석 가돌리늄)
  *   - /도감 [음절] : 한방 끝글자 도감 설명 확인 (예: !도감 늄)
  *   - /추천 : 강력한 추천 단어 3개 무작위 제시
+ *   - /업데이트 : 웹 서버에서 단어 데이터베이스 강제 새로고침
  */
+
+// 데이터베이스 URL (GitHub Pages에 배포된 JSON 파일)
+const DB_URL = "https://ghhwang314.github.io/shiritori-helper/words.json";
 
 // 1. 공격 끝글자 규칙 데이터베이스
 const ATTACK_RULES = ${attackRulesText}
 
-// 2. 한방단어 데이터베이스
-const WORD_DATABASE = ${wordDbText}
+// 2. 전역 캐시 변수
+let WORD_DATABASE = null;
+let isDownloading = false;
 
-// 3. 메신저봇R 알림 이벤트 수신 함수
+// 3. 데이터베이스 웹 로드 함수
+function loadDatabase() {
+    if (WORD_DATABASE && WORD_DATABASE.length > 0) return true;
+    if (isDownloading) return false;
+    
+    isDownloading = true;
+    try {
+        let jsonText = "";
+        try {
+            // 메신저봇R 내장 유틸리티 사용
+            jsonText = Utils.getWebText(DB_URL);
+        } catch (e) {
+            // JSoup 라이브러리 사용 백업
+            jsonText = org.jsoup.Jsoup.connect(DB_URL)
+                .ignoreContentType(true)
+                .maxBodySize(0)
+                .timeout(10000)
+                .execute()
+                .body();
+        }
+        
+        if (jsonText) {
+            jsonText = jsonText.trim();
+            WORD_DATABASE = JSON.parse(jsonText);
+            isDownloading = false;
+            return true;
+        }
+    } catch (err) {
+        // 오류 처리
+    }
+    isDownloading = false;
+    return false;
+}
+
+// 4. 메신저봇R 알림 이벤트 수신 함수
 function response(room, msg, sender, isGroupChat, replier, imageDB, packageName) {
     // 공백 제거 및 명령어 파싱
     msg = msg.trim();
@@ -67,128 +113,150 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
             "4. " + prefix + "도감 [글자] : 한방 끝글자 도감 확인",
             "   (예시: " + prefix + "도감, " + prefix + "도감 늄)",
             "5. " + prefix + "추천 : 무작위 한방단어 3개 추천",
+            "6. " + prefix + "업데이트 : 최신 단어 정보 웹 새로고침",
             "",
             "💡 모든 검색 및 도감 결과는 채팅방 도배 방지를 위해 '전체보기' 내부에 상세히 표시됩니다."
         ].join('\\n');
         replier.reply(helpMsg);
     }
     
-    else if (command === '검색') {
-        if (!parameter) {
-            replier.reply("⚠️ 검색어를 입력해 주세요.\\n사용법: " + prefix + "검색 <자음/글자/단어> (예: " + prefix + "검색 ㄱ)");
-            return;
-        }
-        
-        const query = parameter.toLowerCase();
-        const results = filterWords(query);
-        
-        if (results.length === 0) {
-            replier.reply("❌ '" + parameter + "'에 매칭되는 한방단어를 찾지 못했습니다.");
-            return;
-        }
-        
-        // 정렬 (티어 내림차순, 그 다음 가나다순)
-        results.sort((a, b) => {
-            if (b.tier !== a.tier) return b.tier - a.tier;
-            return a.word.localeCompare(b.word, 'ko');
-        });
-        
-        let title = "🔍 [한방단어 검색 결과]\\n";
-        title += "'" + parameter + "' 검색 결과 (총 " + results.length + "개):";
-        
-        let body = "\\n" + readMore + "\\n";
-        results.forEach((item, idx) => {
-            let tierStar = "⭐".repeat(item.tier);
-            body += (idx + 1) + ". " + item.word + " (" + getTierName(item.tier) + " " + tierStar + ")\\n";
-            body += "   뜻: " + item.definition + "\\n\\n";
-        });
-        
-        replier.reply(title + body.trim());
-    }
-    
-    else if (command === '분석') {
-        if (!parameter) {
-            replier.reply("⚠️ 분석할 단어를 입력해 주세요.\\n사용법: " + prefix + "분석 <단어> (예: " + prefix + "분석 리튬)");
-            return;
-        }
-        
-        const word = parameter;
-        const koreanRegex = /^[가-힣]+$/;
-        if (!koreanRegex.test(word)) {
-            replier.reply("⚠️ 한글로만 이루어진 단어를 입력해 주세요.");
-            return;
-        }
-        
-        const lastChar = word.slice(-1);
-        const rule = ATTACK_RULES[lastChar];
-        
-        let replyMsg = "🧐 [" + word + "] 실시간 공격력 분석\\n\\n";
-        if (rule) {
-            let tierStar = "⭐".repeat(rule.tier);
-            replyMsg += "▶ 마지막 글자: [" + lastChar + "]\\n";
-            replyMsg += "▶ 판정 등급: " + rule.name + " (" + tierStar + ")\\n";
-            replyMsg += "▶ 상세 분석: " + rule.desc + "\\n\\n";
-            replyMsg += "💡 추천 팁: 게임 중 이 단어를 구사하면 상대는 방어하지 못하고 게임이 오버될 확률이 극도로 높습니다.";
+    else if (command === '업데이트') {
+        replier.reply("🔄 웹 서버에서 최신 단어 데이터베이스를 다운로드합니다...");
+        WORD_DATABASE = null;
+        if (loadDatabase()) {
+            replier.reply("✅ 업데이트 완료! 총 " + WORD_DATABASE.length + "개의 단어가 성공적으로 로드되었습니다.");
         } else {
-            replyMsg += "▶ 마지막 글자: [" + lastChar + "]\\n";
-            replyMsg += "▶ 판정 등급: 일반 단어 (방어 가능)\\n";
-            replyMsg += "▶ 상세 분석: '" + lastChar + "'(으)로 시작하는 표준어가 존재하여 상대방이 받아칠 수 있습니다.\\n\\n";
-            replyMsg += "💡 추천 팁: 늄, 륨, 튬, 녘, 슭, 팎 등 한방 끝글자로 끝나는 단어를 설계해 보세요!";
+            replier.reply("❌ 업데이트 실패. 인터넷 연결이나 웹 사이트 주소(" + DB_URL + ")를 확인해 주세요.");
         }
-        replier.reply(replyMsg);
     }
     
-    else if (command === '도감') {
-        if (parameter) {
-            const char = parameter.trim();
-            const rule = ATTACK_RULES[char];
-            if (!rule) {
-                replier.reply("❌ '" + char + "'은(는) 등록된 한방 공격 끝글자가 아닙니다.");
+    else {
+        // 단어 데이터베이스 로딩 시도
+        if (!WORD_DATABASE || WORD_DATABASE.length === 0) {
+            const success = loadDatabase();
+            if (!success) {
+                replier.reply("⚠️ 단어 데이터베이스를 불러오는 중입니다. 잠시 후 다시 명령어를 입력해 주세요. (혹은 " + prefix + "업데이트 입력)");
                 return;
             }
-            let tierStar = "⭐".repeat(rule.tier);
-            let msgOut = "📖 [한방 끝글자 도감 - " + char + "]\\n\\n";
-            msgOut += "▶ 공격 등급: " + rule.name + " (" + tierStar + ")\\n";
-            msgOut += "▶ 분석 설명: " + rule.desc + "\\n\\n";
-            
-            const examples = WORD_DATABASE.filter(w => w.endChar === char).map(w => w.word);
-            if (examples.length > 0) {
-                msgOut += "💡 대표 예시 단어: " + examples.slice(0, 8).join(', ');
+        }
+        
+        if (command === '검색') {
+            if (!parameter) {
+                replier.reply("⚠️ 검색어를 입력해 주세요.\\n사용법: " + prefix + "검색 <자음/글자/단어> (예: " + prefix + "검색 ㄱ)");
+                return;
             }
-            replier.reply(msgOut);
-        } else {
-            // 전체 도감 목록 출력
-            let title = "📖 [끝글자 공격 도감 전체 목록]";
+            
+            const query = parameter.toLowerCase();
+            const results = filterWords(query);
+            
+            if (results.length === 0) {
+                replier.reply("❌ '" + parameter + "'에 매칭되는 한방단어를 찾지 못했습니다.");
+                return;
+            }
+            
+            // 정렬 (티어 내림차순, 그 다음 가나다순)
+            results.sort((a, b) => {
+                if (b.tier !== a.tier) return b.tier - a.tier;
+                return a.word.localeCompare(b.word, 'ko');
+            });
+            
+            let title = "🔍 [한방단어 검색 결과]\\n";
+            title += "'" + parameter + "' 검색 결과 (총 " + results.length + "개):";
+            
             let body = "\\n" + readMore + "\\n";
-            
-            const sortedRules = Object.keys(ATTACK_RULES).map(key => {
-                return { key, rule: ATTACK_RULES[key] };
-            }).sort((a, b) => {
-                if (b.rule.tier !== a.rule.tier) return b.rule.tier - a.rule.tier;
-                return a.key.localeCompare(b.key, 'ko');
+            results.forEach((item, idx) => {
+                let tierStar = "⭐".repeat(item.tier);
+                body += (idx + 1) + ". " + item.word + " (" + getTierName(item.tier) + " " + tierStar + ")\\n";
+                body += "   뜻: " + item.definition + "\\n\\n";
             });
             
-            sortedRules.forEach(item => {
-                let tierStar = "⭐".repeat(item.rule.tier);
-                body += "[" + item.key + "] - " + item.rule.name + " (" + tierStar + ")\\n";
-                body += "설명: " + item.rule.desc + "\\n\\n";
-            });
             replier.reply(title + body.trim());
         }
-    }
-    
-    else if (command === '추천') {
-        // 랜덤으로 3개 단어 추출
-        const shuffled = WORD_DATABASE.slice().sort(() => 0.5 - Math.random());
-        const selected = shuffled.slice(0, 3);
         
-        let msgOut = "🎲 [오늘의 추천 필승 한방단어]\\n\\n";
-        selected.forEach((item, idx) => {
-            let tierStar = "⭐".repeat(item.tier);
-            msgOut += (idx + 1) + ". " + item.word + " (" + getTierName(item.tier) + " " + tierStar + ")\\n";
-            msgOut += "   뜻: " + item.definition + "\\n\\n";
-        });
-        replier.reply(msgOut.trim());
+        else if (command === '분석') {
+            if (!parameter) {
+                replier.reply("⚠️ 분석할 단어를 입력해 주세요.\\n사용법: " + prefix + "분석 <단어> (예: " + prefix + "분석 리튬)");
+                return;
+            }
+            
+            const word = parameter;
+            const koreanRegex = /^[가-힣]+$/;
+            if (!koreanRegex.test(word)) {
+                replier.reply("⚠️ 한글로만 이루어진 단어를 입력해 주세요.");
+                return;
+            }
+            
+            const lastChar = word.slice(-1);
+            const rule = ATTACK_RULES[lastChar];
+            
+            let replyMsg = "🧐 [" + word + "] 실시간 공격력 분석\\n\\n";
+            if (rule) {
+                let tierStar = "⭐".repeat(rule.tier);
+                replyMsg += "▶ 마지막 글자: [" + lastChar + "]\\n";
+                replyMsg += "▶ 판정 등급: " + rule.name + " (" + tierStar + ")\\n";
+                replyMsg += "▶ 상세 분석: " + rule.desc + "\\n\\n";
+                replyMsg += "💡 추천 팁: 게임 중 이 단어를 구사하면 상대는 방어하지 못하고 게임이 오버될 확률이 극도로 높습니다.";
+            } else {
+                replyMsg += "▶ 마지막 글자: [" + lastChar + "]\\n";
+                replyMsg += "▶ 판정 등급: 일반 단어 (방어 가능)\\n";
+                replyMsg += "▶ 상세 분석: '" + lastChar + "'(으)로 시작하는 표준어가 존재하여 상대방이 받아칠 수 있습니다.\\n\\n";
+                replyMsg += "💡 추천 팁: 늄, 륨, 튬, 녘, 슭, 팎 등 한방 끝글자로 끝나는 단어를 설계해 보세요!";
+            }
+            replier.reply(replyMsg);
+        }
+        
+        else if (command === '도감') {
+            if (parameter) {
+                const char = parameter.trim();
+                const rule = ATTACK_RULES[char];
+                if (!rule) {
+                    replier.reply("❌ '" + char + "'은(는) 등록된 한방 공격 끝글자가 아닙니다.");
+                    return;
+                }
+                let tierStar = "⭐".repeat(rule.tier);
+                let msgOut = "📖 [한방 끝글자 도감 - " + char + "]\\n\\n";
+                msgOut += "▶ 공격 등급: " + rule.name + " (" + tierStar + ")\\n";
+                msgOut += "▶ 분석 설명: " + rule.desc + "\\n\\n";
+                
+                const examples = WORD_DATABASE.filter(w => w.endChar === char).map(w => w.word);
+                if (examples.length > 0) {
+                    msgOut += "💡 대표 예시 단어: " + examples.slice(0, 8).join(', ');
+                }
+                replier.reply(msgOut);
+            } else {
+                // 전체 도감 목록 출력
+                let title = "📖 [끝글자 공격 도감 전체 목록]";
+                let body = "\\n" + readMore + "\\n";
+                
+                const sortedRules = Object.keys(ATTACK_RULES).map(key => {
+                    return { key, rule: ATTACK_RULES[key] };
+                }).sort((a, b) => {
+                    if (b.rule.tier !== a.rule.tier) return b.rule.tier - a.rule.tier;
+                    return a.key.localeCompare(b.key, 'ko');
+                });
+                
+                sortedRules.forEach(item => {
+                    let tierStar = "⭐".repeat(item.rule.tier);
+                    body += "[" + item.key + "] - " + item.rule.name + " (" + tierStar + ")\\n";
+                    body += "설명: " + item.rule.desc + "\\n\\n";
+                });
+                replier.reply(title + body.trim());
+            }
+        }
+        
+        else if (command === '추천') {
+            // 랜덤으로 3개 단어 추출
+            const shuffled = WORD_DATABASE.slice().sort(() => 0.5 - Math.random());
+            const selected = shuffled.slice(0, 3);
+            
+            let msgOut = "🎲 [오늘의 추천 필승 한방단어]\\n\\n";
+            selected.forEach((item, idx) => {
+                let tierStar = "⭐".repeat(item.tier);
+                msgOut += (idx + 1) + ". " + item.word + " (" + getTierName(item.tier) + " " + tierStar + ")\\n";
+                msgOut += "   뜻: " + item.definition + "\\n\\n";
+            });
+            replier.reply(msgOut.trim());
+        }
     }
 }
 
@@ -234,7 +302,7 @@ function getTierName(tier) {
 `;
 
     fs.writeFileSync('kakaotalk-bot.js', template, 'utf8');
-    console.log('kakaotalk-bot.js generated successfully.');
+    console.log('kakaotalk-bot.js (Lightweight Network Version) generated successfully.');
 } catch (err) {
     console.error('Error generating bot script:', err);
     process.exit(1);
