@@ -163,7 +163,9 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
             "5. " + prefix + "추천 : 무작위 한방단어 3개 추천",
             "6. " + prefix + "업데이트 : 최신 단어 정보 웹 새로고침",
             "",
-            "💡 모든 검색 및 도감 결과는 채팅방 도배 방지를 위해 '전체보기' 내부에 상세히 표시됩니다."
+            "💡 모든 검색 및 도감 결과는 채팅방 도배 방지를 위해 '전체보기' 내부에 상세히 표시됩니다.",
+            "",
+            "copyrightⒸ H.⍢⃝❤️⍤⃝🍋⍥⃝🍰⍣⃝🧊 All Right Reserved."
         ].join('\\n');
         replier.reply(helpMsg);
     }
