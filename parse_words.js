@@ -54,29 +54,34 @@ function parseWordsFile(filepath) {
         if (line.startsWith('::')) continue;
         if (line.includes('.') && !isNaN(line.replace(/\./g, ''))) continue; // Ignore date line
         
-        // Syllable header e.g., [가]
-        const sylMatch = line.match(/^\[([가-힣]+)\]$/);
+        // Syllable header e.g., [가], 깨], [각]
+        const sylMatch = line.match(/^\[?([가-힣])\]?$/);
         if (sylMatch) {
             currentSyllable = sylMatch[1];
             continue;
         }
         
-        // Mode switch
-        if (line === '-한방-') {
-            currentMode = '한방';
-            continue;
-        }
-        if (line === '-유도-') {
-            currentMode = '유도';
-            continue;
-        }
+        // Split line by space but first format -한방- and -유도- to be treated as separate tokens
+        const cleanLine = line.replace(/-한방-/g, ' -한방- ').replace(/-유도-/g, ' -유도- ');
+        const list = cleanLine.split(/\s+/).filter(x => x.trim());
         
-        // Words list
-        if (currentSyllable && currentMode) {
-            const list = line.split(/\s+/).filter(x => x.trim());
-            for (const word of list) {
-                const startChar = word.charAt(0);
-                const endChar = word.slice(-1);
+        for (const token of list) {
+            if (token === '-한방-') {
+                currentMode = '한방';
+                continue;
+            }
+            if (token === '-유도-') {
+                currentMode = '유도';
+                continue;
+            }
+            
+            if (currentSyllable && currentMode) {
+                // Remove any residual tags from the word itself
+                const cleanWord = token.replace(/-한방-/g, '').replace(/-유도-/g, '').trim();
+                if (!cleanWord) continue;
+                
+                const startChar = cleanWord.charAt(0);
+                const endChar = cleanWord.slice(-1);
                 
                 // Calculate tier
                 let tier = 0;
@@ -91,7 +96,7 @@ function parseWordsFile(filepath) {
                 }
                 
                 words.push({
-                    word,
+                    word: cleanWord,
                     startChar,
                     endChar,
                     definition,
@@ -127,8 +132,11 @@ try {
 
     // Merge databases
     const wordMap = new Map();
-    // Load existing words
+    // Load existing words (filter out corrupted entries containing hyphens or tags)
     existingDb.forEach(item => {
+        if (item.word.includes('-') || item.word.includes('한방') || item.word.includes('유도')) {
+            return;
+        }
         wordMap.set(item.word, item);
     });
     // Add or update parsed words
