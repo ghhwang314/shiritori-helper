@@ -5829,9 +5829,15 @@ function renderWordList(resetLimit = true) {
 
     // 필터링 적용
     let filtered = WORD_DATABASE.filter(item => {
-        // 1. 즐겨찾기 탭 필터
+        // 1. 탭 필터 (한방단어 vs 유도단어 vs 즐겨찾기)
+        if (currentTab === 'all' && item.tier === 1) {
+            return false; // 한방단어 탭에서는 유도단어(tier 1) 제외
+        }
+        if (currentTab === 'lure' && item.tier > 1) {
+            return false; // 유도단어 탭에서는 한방단어(tier 3,4,5) 제외
+        }
         if (currentTab === 'favorites' && !favorites.includes(item.word)) {
-            return false;
+            return false; // 즐겨찾기 탭에서는 즐겨찾기 목록에 없는 것 제외
         }
 
         // 2. 초성 퀵 필터
@@ -5887,7 +5893,13 @@ function renderWordList(resetLimit = true) {
     });
 
     // 뱃지 업데이트
-    document.getElementById('total-words-count').textContent = WORD_DATABASE.length;
+    const totalWords = WORD_DATABASE.filter(w => w.tier > 1).length;
+    const lureWords = WORD_DATABASE.filter(w => w.tier === 1).length;
+    document.getElementById('total-words-count').textContent = totalWords;
+    if (document.getElementById('lure-words-count')) {
+        document.getElementById('lure-words-count').textContent = lureWords;
+    }
+    document.getElementById('fav-words-count').textContent = favorites.length;
 
     // 결과가 없는 경우 처리
     if (filtered.length === 0) {
@@ -6267,17 +6279,28 @@ function initEvents() {
 
     // 탭 전환 이벤트
     const tabAll = document.getElementById('tab-all-words');
+    const tabLure = document.getElementById('tab-lure-words');
     const tabFav = document.getElementById('tab-fav-words');
 
     tabAll.addEventListener('click', () => {
+        tabLure.classList.remove('active');
         tabFav.classList.remove('active');
         tabAll.classList.add('active');
         currentTab = 'all';
         renderWordList();
     });
 
+    tabLure.addEventListener('click', () => {
+        tabAll.classList.remove('active');
+        tabFav.classList.remove('active');
+        tabLure.classList.add('active');
+        currentTab = 'lure';
+        renderWordList();
+    });
+
     tabFav.addEventListener('click', () => {
         tabAll.classList.remove('active');
+        tabLure.classList.remove('active');
         tabFav.classList.add('active');
         currentTab = 'favorites';
         renderWordList();
