@@ -165,7 +165,7 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
             "",
             "💡 모든 검색 및 도감 결과는 채팅방 도배 방지를 위해 '전체보기' 내부에 상세히 표시됩니다.",
             "",
-            "copyrightⒸ H.⍢⃝❤️⍤⃝🍋⍥⃝🍰⍣⃝🧊 All Right Reserved."
+            "copyright\\u24b8 H.\\u2362\\u20dd\\u2764\\ufe0f \\u2364\\u20dd\\ud83c\\udf4b\\u2365\\u20dd\\ud83c\\udf70 \\u2363\\u20dd\\ud83e\\uddca All Right Reserved."
         ].join('\\n');
         replier.reply(helpMsg);
     }
