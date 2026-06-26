@@ -132,7 +132,7 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
         if (loadDatabase()) {
             replier.reply("✅ 업데이트 완료! 총 " + WORD_DATABASE.length + "개의 단어가 성공적으로 로드되었습니다.");
         } else {
-            replier.reply("❌ 업데이트 실패. 인터넷 연결이나 웹 사이트 주소(" + DB_URL + ")를 확인해 주세요.");
+            replier.reply("❌ 업데이트 실패. 인터넷 연결 상태를 확인해 주세요.");
         }
     }
     
