@@ -358,10 +358,8 @@ function filterWords(searchQuery) {
             return getChosung(firstChar) === searchQuery;
         }
         
-        // 일반 텍스트 검색
-        return item.word.indexOf(searchQuery) !== -1 || 
-               item.startChar.indexOf(searchQuery) !== -1 ||
-               item.endChar.indexOf(searchQuery) !== -1;
+        // 일반 텍스트 검색 (단어가 검색어로 시작하는 경우만 매칭)
+        return item.word.indexOf(searchQuery) === 0;
     });
 }
 
