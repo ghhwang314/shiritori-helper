@@ -1813,6 +1813,13 @@
     "tier": 5
   },
   {
+    "word": "부옄",
+    "startChar": "부",
+    "endChar": "옄",
+    "definition": "[사전] 끝말잇기용 필승 단어 (끝글자: 옄)",
+    "tier": 5
+  },
+  {
     "word": "북녘",
     "startChar": "북",
     "endChar": "녘",
@@ -2762,6 +2769,13 @@
     "startChar": "시",
     "endChar": "튬",
     "definition": "[사전] 끝말잇기용 필승 단어 (끝글자: 튬)",
+    "tier": 5
+  },
+  {
+    "word": "시루볜",
+    "startChar": "시",
+    "endChar": "볜",
+    "definition": "[사전] 끝말잇기용 필승 단어 (끝글자: 볜)",
     "tier": 5
   },
   {
