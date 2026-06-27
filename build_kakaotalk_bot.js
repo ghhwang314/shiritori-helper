@@ -204,9 +204,9 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
             if (results.length === 0) {
                 var rule = ATTACK_RULES[parameter];
                 if (rule && rule.defense) {
-                    replier.reply("❌ '" + parameter + "'에 매칭되는 한방단어를 찾지 못했습니다.\\n\\n💡 ['" + parameter + "'] 대응 반박/방어 단어 목록:\\n" + rule.defense);
+                    replier.reply("❌ '" + parameter + "'에 매칭되는 단어를 찾지 못했습니다.\\n\\n💡 ['" + parameter + "'] 대응 반박/방어 단어 목록:\\n" + rule.defense);
                 } else {
-                    replier.reply("❌ '" + parameter + "'에 매칭되는 한방단어를 찾지 못했습니다.");
+                    replier.reply("❌ '" + parameter + "'에 매칭되는 단어를 찾지 못했습니다.");
                 }
                 return;
             }
@@ -217,7 +217,7 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
                 return a.word > b.word ? 1 : (a.word < b.word ? -1 : 0);
             });
             
-            var title = "🔍 [한방단어 검색 결과]\\n";
+            var title = "🔍 [검색 결과]\\n";
             title += "'" + parameter + "' 검색 결과 (총 " + results.length + "개):";
             
             var body = "\\n" + readMore + "\\n";
