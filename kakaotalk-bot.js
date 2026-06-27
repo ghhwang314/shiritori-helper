@@ -60,9 +60,9 @@ var ATTACK_RULES = {
 // 2. 전역 캐시 변수
 var WORD_DATABASE = null;
 var isDownloading = false;
-var ALL_WORDS_TEXT = null;
+var DICT_CACHE = {};
 var isDownloadingAll = false;
-var ALL_WORDS_URL = "https://ghhwang314.github.io/shiritori-helper/words_all.txt";
+var BASE_DICT_URL = "https://ghhwang314.github.io/shiritori-helper/dict/";
 
 // 3. 웹 텍스트 다운로드 헬퍼 함수 (3중 백업 지원)
 function fetchWebText(urlStr) {
@@ -140,23 +140,25 @@ function loadDatabase() {
     return false;
 }
 
-function loadAllWords() {
-    if (ALL_WORDS_TEXT) return true;
-    if (isDownloadingAll) return false;
+function loadChosungDict(chosung) {
+    if (DICT_CACHE[chosung]) return DICT_CACHE[chosung];
+    if (isDownloadingAll) return null;
     
     isDownloadingAll = true;
     try {
-        var text = fetchWebText(ALL_WORDS_URL);
+        var url = BASE_DICT_URL + encodeURIComponent(chosung) + ".txt";
+        var text = fetchWebText(url);
         if (text) {
-            ALL_WORDS_TEXT = "\n" + text.replace(/\r/g, "") + "\n";
+            var cleanText = "\n" + text.replace(/\r/g, "") + "\n";
+            DICT_CACHE[chosung] = cleanText;
             isDownloadingAll = false;
-            return true;
+            return cleanText;
         }
     } catch (err) {
         // 에러
     }
     isDownloadingAll = false;
-    return false;
+    return null;
 }
 
 // 4. 메신저봇R 알림 이벤트 수신 함수
@@ -213,11 +215,9 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
     else if (command === '업데이트') {
         replier.reply("🔄 웹 서버에서 최신 단어 데이터베이스를 다운로드합니다...");
         WORD_DATABASE = null;
-        ALL_WORDS_TEXT = null;
-        var successDb = loadDatabase();
-        var successAll = loadAllWords();
-        if (successDb && successAll) {
-            replier.reply("✅ 업데이트 완료! 핵심 한방단어 " + WORD_DATABASE.length + "개와 전체 사전 데이터가 성공적으로 로드되었습니다.");
+        DICT_CACHE = {};
+        if (loadDatabase()) {
+            replier.reply("✅ 업데이트 완료! 핵심 한방단어 " + WORD_DATABASE.length + "개와 전체 자음별 사전 연동이 성공적으로 준비되었습니다.");
         } else {
             replier.reply("❌ 업데이트 실패. 인터넷 연결 상태를 확인해 주세요.");
         }
@@ -292,18 +292,19 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
                 return;
             }
             
+            var firstChar = word.charAt(0);
+            var chosung = getChosung(firstChar);
+            
             // 데이터 로드 확인
-            if (!ALL_WORDS_TEXT) {
-                var success = loadAllWords();
-                if (!success) {
-                    replier.reply("⚠️ 전체 사전 데이터를 불러오는 중입니다. 잠시 후 다시 명령어를 입력해 주세요. (혹은 " + prefix + "업데이트 입력)");
-                    return;
-                }
+            var dictText = loadChosungDict(chosung);
+            if (!dictText) {
+                replier.reply("⚠️ 사전 데이터를 불러오는 중입니다. 잠시 후 다시 명령어를 입력해 주세요. (혹은 인터넷 연결 상태 확인)");
+                return;
             }
             
-            // 1. 전체 사전 파일에 이 단어가 존재하는지 판별
+            // 1. 해당 자음 사전 파일에 이 단어가 존재하는지 판별
             var cleanWord = word.toLowerCase();
-            var exists = (ALL_WORDS_TEXT.indexOf("\n" + cleanWord + "\n") !== -1);
+            var exists = (dictText.indexOf("\n" + cleanWord + "\n") !== -1);
             
             var replyMsg = "🧐 [" + word + "] 끝말잇기 사용성 판정\n\n";
             
