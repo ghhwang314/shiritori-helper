@@ -364,16 +364,20 @@ function getChosung(char) {
 }
 
 function filterWords(searchQuery) {
+    var query = searchQuery.trim().toLowerCase();
+    if (!query) return [];
+    
     return WORD_DATABASE.filter(function(item) {
-        var firstChar = item.word.charAt(0);
+        var wordClean = item.word.trim().toLowerCase();
+        var firstChar = wordClean.charAt(0);
         
         // 검색어가 초성 한 글자인 경우
-        if (searchQuery.length === 1 && CHOSUNG_LIST.indexOf(searchQuery) !== -1) {
-            return getChosung(firstChar) === searchQuery;
+        if (query.length === 1 && CHOSUNG_LIST.indexOf(query) !== -1) {
+            return getChosung(firstChar) === query;
         }
         
         // 일반 텍스트 검색 (단어가 검색어로 시작하는 경우만 매칭)
-        return item.word.indexOf(searchQuery) === 0;
+        return wordClean.indexOf(query) === 0;
     });
 }
 
