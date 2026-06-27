@@ -202,7 +202,12 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
             var results = filterWords(query);
             
             if (results.length === 0) {
-                replier.reply("❌ '" + parameter + "'에 매칭되는 한방단어를 찾지 못했습니다.");
+                var rule = ATTACK_RULES[parameter];
+                if (rule && rule.defense) {
+                    replier.reply("❌ '" + parameter + "'에 매칭되는 한방단어를 찾지 못했습니다.\\n\\n💡 ['" + parameter + "'] 대응 반박/방어 단어 목록:\\n" + rule.defense);
+                } else {
+                    replier.reply("❌ '" + parameter + "'에 매칭되는 한방단어를 찾지 못했습니다.");
+                }
                 return;
             }
             
@@ -224,6 +229,11 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
                 body += (idx + 1) + ". " + item.word + " (" + getTierName(item.tier) + " " + tierStar + ")\\n";
                 body += "   뜻: " + item.definition + "\\n\\n";
             });
+            
+            var rule = ATTACK_RULES[parameter];
+            if (rule && rule.defense) {
+                body += "\\n----------------------\\n💡 ['" + parameter + "'] 대응 반박/방어 단어 목록:\\n" + rule.defense + "\\n";
+            }
             
             replier.reply(title + body.trim());
         }
