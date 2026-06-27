@@ -60,6 +60,9 @@ var ATTACK_RULES = {
 // 2. 전역 캐시 변수
 var WORD_DATABASE = null;
 var isDownloading = false;
+var ALL_WORDS_TEXT = null;
+var isDownloadingAll = false;
+var ALL_WORDS_URL = "https://ghhwang314.github.io/shiritori-helper/words_all.txt";
 
 // 3. 웹 텍스트 다운로드 헬퍼 함수 (3중 백업 지원)
 function fetchWebText(urlStr) {
@@ -137,6 +140,25 @@ function loadDatabase() {
     return false;
 }
 
+function loadAllWords() {
+    if (ALL_WORDS_TEXT) return true;
+    if (isDownloadingAll) return false;
+    
+    isDownloadingAll = true;
+    try {
+        var text = fetchWebText(ALL_WORDS_URL);
+        if (text) {
+            ALL_WORDS_TEXT = "\n" + text.replace(/\r/g, "") + "\n";
+            isDownloadingAll = false;
+            return true;
+        }
+    } catch (err) {
+        // 에러
+    }
+    isDownloadingAll = false;
+    return false;
+}
+
 // 4. 메신저봇R 알림 이벤트 수신 함수
 function response(room, msg, sender, isGroupChat, replier, imageDB, packageName) {
     // 공백 제거 및 명령어 파싱
@@ -191,8 +213,11 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
     else if (command === '업데이트') {
         replier.reply("🔄 웹 서버에서 최신 단어 데이터베이스를 다운로드합니다...");
         WORD_DATABASE = null;
-        if (loadDatabase()) {
-            replier.reply("✅ 업데이트 완료! 총 " + WORD_DATABASE.length + "개의 단어가 성공적으로 로드되었습니다.");
+        ALL_WORDS_TEXT = null;
+        var successDb = loadDatabase();
+        var successAll = loadAllWords();
+        if (successDb && successAll) {
+            replier.reply("✅ 업데이트 완료! 핵심 한방단어 " + WORD_DATABASE.length + "개와 전체 사전 데이터가 성공적으로 로드되었습니다.");
         } else {
             replier.reply("❌ 업데이트 실패. 인터넷 연결 상태를 확인해 주세요.");
         }
@@ -267,41 +292,68 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
                 return;
             }
             
-            // 1. 데이터베이스에서 완전 일치 단어 찾기
-            var matchedItem = null;
-            for (var i = 0; i < WORD_DATABASE.length; i++) {
-                if (WORD_DATABASE[i].word === word) {
-                    matchedItem = WORD_DATABASE[i];
-                    break;
+            // 데이터 로드 확인
+            if (!ALL_WORDS_TEXT) {
+                var success = loadAllWords();
+                if (!success) {
+                    replier.reply("⚠️ 전체 사전 데이터를 불러오는 중입니다. 잠시 후 다시 명령어를 입력해 주세요. (혹은 " + prefix + "업데이트 입력)");
+                    return;
                 }
             }
             
+            // 1. 전체 사전 파일에 이 단어가 존재하는지 판별
+            var cleanWord = word.toLowerCase();
+            var exists = (ALL_WORDS_TEXT.indexOf("\n" + cleanWord + "\n") !== -1);
+            
             var replyMsg = "🧐 [" + word + "] 끝말잇기 사용성 판정\n\n";
-            if (matchedItem) {
-                var tierStar = "";
-                for (var s = 0; s < matchedItem.tier; s++) {
-                    tierStar += "⭐";
+            
+            if (exists) {
+                // 2. 한방단어 DB에서 완전 일치 단어 매칭
+                var matchedItem = null;
+                for (var i = 0; i < WORD_DATABASE.length; i++) {
+                    if (WORD_DATABASE[i].word.toLowerCase() === cleanWord) {
+                        matchedItem = WORD_DATABASE[i];
+                        break;
+                    }
                 }
-                replyMsg += "✅ 판정: [사용 가능 (필승 한방단어)]\n";
-                replyMsg += "▶ 등급: " + getTierName(matchedItem.tier) + " (" + tierStar + ")\n";
-                replyMsg += "▶ 뜻: " + matchedItem.definition + "\n\n";
-                replyMsg += "💡 추천 팁: 끝말잇기 족보에 등록된 확실한 필승 한방단어입니다. 게임 중 사용 시 승리가 보장됩니다!";
-            } else {
-                // DB에는 없지만 마지막 글자가 한방 단어 규칙에 맞는지 확인
-                var lastChar = word.slice(-1);
-                var rule = ATTACK_RULES[lastChar];
-                if (rule) {
+                
+                if (matchedItem) {
                     var tierStar = "";
-                    for (var s = 0; s < rule.tier; s++) {
+                    for (var s = 0; s < matchedItem.tier; s++) {
                         tierStar += "⭐";
                     }
-                    replyMsg += "⚠️ 판정: [확인 필요 (한방 유력 단어)]\n";
-                    replyMsg += "▶ 설명: 비법 데이터베이스에는 단어가 등록되어 있지 않으나, 마지막 글자 [" + lastChar + "]가 한방 끝글자(" + rule.name + " " + tierStar + ")에 해당합니다.\n\n";
-                    replyMsg += "💡 추천 팁: 표준국어대사전에 등재된 단어라면 상대방이 받아칠 수 없는 훌륭한 필승 단어로 작동할 수 있습니다.";
+                    replyMsg += "✅ 판정: [사용 가능 (필승 한방단어)]\n";
+                    replyMsg += "▶ 등급: " + getTierName(matchedItem.tier) + " (" + tierStar + ")\n";
+                    replyMsg += "▶ 뜻: " + matchedItem.definition + "\n\n";
+                    replyMsg += "💡 추천 팁: 끝말잇기 족보에 등록된 확실한 필승 한방단어입니다. 게임 중 사용 시 승리가 보장됩니다!";
                 } else {
-                    replyMsg += "❌ 판정: [일반 단어 (방어 불가 아님)]\n";
-                    replyMsg += "▶ 설명: 이 단어는 한방단어 DB에 등록되어 있지 않으며, 마지막 글자 [" + lastChar + "]로 시작하는 방어 단어가 상대방에게 존재합니다.\n\n";
-                    replyMsg += "💡 추천 팁: 늄, 륨, 튬, 녘, 슭, 팎 등 한방 끝글자로 끝나는 단어를 사용하셔야 상대를 한방에 제압할 수 있습니다.";
+                    // 한방단어는 아니지만 사용 가능
+                    var lastChar = word.slice(-1);
+                    var rule = ATTACK_RULES[lastChar];
+                    if (rule) {
+                        var tierStar = "";
+                        for (var s = 0; s < rule.tier; s++) {
+                            tierStar += "⭐";
+                        }
+                        replyMsg += "✅ 판정: [사용 가능 (일반 단어 - 한방 효과 유력)]\n";
+                        replyMsg += "▶ 설명: 사전에는 등록되어 있고 끝글자 [" + lastChar + "]가 한방 끝글자 규칙(" + rule.name + " " + tierStar + ")에 포함되므로, 실전에서 상대방이 받아치지 못하는 필승 카드로 쓰일 수 있습니다.\n\n";
+                        replyMsg += "💡 추천 팁: 상대가 반박 단어(방어)를 모르면 바로 게임 오버입니다.";
+                    } else {
+                        replyMsg += "✅ 판정: [사용 가능 (일반 단어)]\n";
+                        replyMsg += "▶ 설명: 사전에 등록된 유효한 단어이며 상대방이 [" + lastChar + "](으)로 시작하는 단어로 쉽게 방어하여 끝말잇기를 이어나갈 수 있습니다.\n\n";
+                        replyMsg += "💡 추천 팁: 상대의 수비선을 무너뜨리려면 한방 끝글자(늄, 륨, 슭, 녘 등)로 끝나는 공격을 설계해 보세요!";
+                    }
+                }
+            } else {
+                // 사전에 없음
+                var lastChar = word.slice(-1);
+                var rule = ATTACK_RULES[lastChar];
+                replyMsg += "❌ 판정: [사용 불가 (사전 미등록 단어)]\n";
+                replyMsg += "▶ 설명: 이 단어는 끄글/끄투 끝말잇기 공식 단어장에 등록되어 있지 않은 단어입니다.\n\n";
+                if (rule) {
+                    replyMsg += "💡 참고: 단어의 마지막 글자 [" + lastChar + "]가 한방 규칙에는 속하지만, 단어 자체가 사전에 등재되지 않아 끝말잇기 엔진에서 거부될 수 있습니다.";
+                } else {
+                    replyMsg += "💡 추천 팁: 늄, 륨, 슭, 녘 등으로 끝나는 올바른 단어를 활용하여 방어 불가 공격을 시도하세요!";
                 }
             }
             replier.reply(replyMsg);
