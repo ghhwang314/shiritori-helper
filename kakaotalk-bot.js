@@ -170,12 +170,14 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
             "1. " + prefix + "도움말 : 현재 도움말 확인",
             "2. " + prefix + "검색 <글자/자음> : 매칭되는 한방단어 검색",
             "   (예시: " + prefix + "검색 ㄱ, " + prefix + "검색 가)",
-            "3. " + prefix + "분석 <단어> : 끝글자 공격력 정밀 분석",
+            "3. " + prefix + "단어 <단어> : 끝말잇기 사용성 판별 및 한방단어 조회",
+            "   (예시: " + prefix + "단어 가돌리늄)",
+            "4. " + prefix + "분석 <단어> : 끝글자 공격력 정밀 분석",
             "   (예시: " + prefix + "분석 가돌리늄)",
-            "4. " + prefix + "도감 [글자] : 한방 끝글자 도감 확인",
+            "5. " + prefix + "도감 [글자] : 한방 끝글자 도감 확인",
             "   (예시: " + prefix + "도감, " + prefix + "도감 늄)",
-            "5. " + prefix + "추천 : 무작위 한방단어 3개 추천",
-            "6. " + prefix + "업데이트 : 최신 단어 정보 웹 새로고침",
+            "6. " + prefix + "추천 : 무작위 한방단어 3개 추천",
+            "7. " + prefix + "업데이트 : 최신 단어 정보 웹 새로고침",
             "",
             "💡 모든 검색 및 도감 결과는 채팅방 도배 방지를 위해 '전체보기' 내부에 상세히 표시됩니다.",
             "",
@@ -238,6 +240,59 @@ function response(room, msg, sender, isGroupChat, replier, imageDB, packageName)
             });
             
             replier.reply(title + body.trim());
+        }
+        
+        else if (command === '단어' || command === '단어검색') {
+            if (!parameter) {
+                replier.reply("⚠️ 검색할 단어를 입력해 주세요.\n사용법: " + prefix + "단어 <단어> (예: " + prefix + "단어 가돌리늄)");
+                return;
+            }
+            
+            var word = parameter.trim();
+            var koreanRegex = /^[가-힣]+$/;
+            if (!koreanRegex.test(word)) {
+                replier.reply("⚠️ 한글로만 이루어진 단어를 입력해 주세요.");
+                return;
+            }
+            
+            // 1. 데이터베이스에서 완전 일치 단어 찾기
+            var matchedItem = null;
+            for (var i = 0; i < WORD_DATABASE.length; i++) {
+                if (WORD_DATABASE[i].word === word) {
+                    matchedItem = WORD_DATABASE[i];
+                    break;
+                }
+            }
+            
+            var replyMsg = "🧐 [" + word + "] 끝말잇기 사용성 판정\n\n";
+            if (matchedItem) {
+                var tierStar = "";
+                for (var s = 0; s < matchedItem.tier; s++) {
+                    tierStar += "⭐";
+                }
+                replyMsg += "✅ 판정: [사용 가능 (필승 한방단어)]\n";
+                replyMsg += "▶ 등급: " + getTierName(matchedItem.tier) + " (" + tierStar + ")\n";
+                replyMsg += "▶ 뜻: " + matchedItem.definition + "\n\n";
+                replyMsg += "💡 추천 팁: 끝말잇기 족보에 등록된 확실한 필승 한방단어입니다. 게임 중 사용 시 승리가 보장됩니다!";
+            } else {
+                // DB에는 없지만 마지막 글자가 한방 단어 규칙에 맞는지 확인
+                var lastChar = word.slice(-1);
+                var rule = ATTACK_RULES[lastChar];
+                if (rule) {
+                    var tierStar = "";
+                    for (var s = 0; s < rule.tier; s++) {
+                        tierStar += "⭐";
+                    }
+                    replyMsg += "⚠️ 판정: [확인 필요 (한방 유력 단어)]\n";
+                    replyMsg += "▶ 설명: 비법 데이터베이스에는 단어가 등록되어 있지 않으나, 마지막 글자 [" + lastChar + "]가 한방 끝글자(" + rule.name + " " + tierStar + ")에 해당합니다.\n\n";
+                    replyMsg += "💡 추천 팁: 표준국어대사전에 등재된 단어라면 상대방이 받아칠 수 없는 훌륭한 필승 단어로 작동할 수 있습니다.";
+                } else {
+                    replyMsg += "❌ 판정: [일반 단어 (방어 불가 아님)]\n";
+                    replyMsg += "▶ 설명: 이 단어는 한방단어 DB에 등록되어 있지 않으며, 마지막 글자 [" + lastChar + "]로 시작하는 방어 단어가 상대방에게 존재합니다.\n\n";
+                    replyMsg += "💡 추천 팁: 늄, 륨, 튬, 녘, 슭, 팎 등 한방 끝글자로 끝나는 단어를 사용하셔야 상대를 한방에 제압할 수 있습니다.";
+                }
+            }
+            replier.reply(replyMsg);
         }
         
         else if (command === '분석') {
