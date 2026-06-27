@@ -5814,17 +5814,18 @@ function renderWordList(resetLimit = true) {
             const isQueryConsonantOnly = [...searchQuery].every(c => CHOSUNG_LIST.includes(c));
             
             if (isQueryConsonantOnly) {
-                // 자음 매칭 (단어가 검색어 자음 문자열로 시작하는지)
+                // 자음 매칭 (단어의 첫 자음이 검색어 자음 문자열로 시작하는지)
                 const wordChosungs = [...item.word].map(c => getChosung(c)).join('');
-                if (!wordChosungs.startsWith(searchQuery)) {
+                if (!wordChosungs.includes(searchQuery)) {
                     return false;
                 }
             } else {
-                // 텍스트 매칭 (단어가 검색어로 시작하는지)
+                // 텍스트 매칭
                 const cleanQuery = searchQuery.trim().toLowerCase();
                 const wordLower = item.word.toLowerCase();
                 
-                if (!wordLower.startsWith(cleanQuery)) {
+                // 단어 전체 포함 여부 또는 첫글자 매칭
+                if (!wordLower.includes(cleanQuery)) {
                     return false;
                 }
             }
