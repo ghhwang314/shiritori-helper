@@ -1,0 +1,240 @@
+var DB_URL = "https://ghhwang314.github.io/shiritori-helper/words.json";
+var BASE_DICT_URL = "https://ghhwang314.github.io/shiritori-helper/dict/";
+var ATTACK_RULES = {
+    '늄': { tier: 5, name: '전설', desc: "'늄' 시작 단어 없음", tag: '늄', defense: '늄바리(사투리), 늄프늄(북한어)' },
+    '륨': { tier: 5, name: '전설', desc: "'륨' 시작 단어 없음", tag: '륨', defense: '륨프늄(북한어), 륨카펫, 륨바' },
+    '튬': { tier: 5, name: '전설', desc: "'튬' 시작 단어 없음", tag: '튬', defense: '튬바(북한어), 튬스톤(지명)' },
+    '뮴': { tier: 5, name: '전설', desc: "'뮴' 시작 단어 없음", tag: '뮴', defense: '뮴산염(북한어)' },
+    '슘': { tier: 5, name: '전설', desc: "'슘' 시작 단어 없음", tag: '슘', defense: '슘페터, 슘스크(지명)' },
+    '븀': { tier: 5, name: '전설', desc: "'븀' 시작 단어 없음", tag: '븀', defense: '븀가루(북한어)' },
+    '듐': { tier: 5, name: '전설', desc: "'듐' 시작 단어 없음", tag: '듐', defense: '듐스톤(지명), 듐바(오타)' },
+    '볜': { tier: 5, name: '전설', desc: "'볜' 시작 단어 없음", tag: '볜', defense: '옌볜(지명)' },
+    '옄': { tier: 5, name: '전설', desc: "'옄' 시작 단어 없음", tag: '옄', defense: '옄새발(신조어)' },
+    '녘': { tier: 5, name: '전설', desc: "'녘' 시작 단어 없음", tag: '녘', defense: '녘새바람(방언)' },
+    '슭': { tier: 5, name: '전설', desc: "'슭' 시작 단어 없음", tag: '슭', defense: '슭곰, 슭곰발(옛말)' },
+    '팎': { tier: 5, name: '전설', desc: "'팎' 시작 단어 없음", tag: '팎', defense: '팎새(방언)' },
+    '엌': { tier: 5, name: '전설', desc: "'엌' 시작 단어 없음", tag: '엌', defense: '엌더러(옛말)' },
+    '탉': { tier: 5, name: '전설', desc: "'탉' 시작 단어 없음", tag: '탉', defense: '탉새(방언)' },
+    '쁨': { tier: 5, name: '전설', desc: "'쁨' 시작 단어 없음", tag: '쁨', defense: '쁨스(신조어)' },
+    '냑': { tier: 5, name: '전설', desc: "'냑' 시작 단어 없음", tag: '냑', defense: '냑료(북한어)' },
+    '읓': { tier: 5, name: '전설', desc: "자모 받침 한방", tag: '읓', defense: '대응 불가' },
+    '읔': { tier: 5, name: '전설', desc: "자모 받침 한방", tag: '읔', defense: '대응 불가' },
+    '읕': { tier: 5, name: '전설', desc: "자모 받침 한방", tag: '읕', defense: '대응 불가' },
+    '읖': { tier: 5, name: '전설', desc: "자모 받침 한방", tag: '읖', defense: '대응 불가' },
+    '읗': { tier: 5, name: '전설', desc: "자모 받침 한방", tag: '읗', defense: '대응 불가' },
+    '즙': { tier: 4, name: '영웅', desc: "'즙' 시작 단어 없음", tag: '즙', defense: '즙채, 즙물(북한어)' },
+    '릇': { tier: 4, name: '영웅', desc: "사실상 한방", tag: '릇', defense: '릇다(옛말)' },
+    '듭': { tier: 4, name: '영웅', desc: "사실상 한방", tag: '듭', defense: '듭새(사투리)' },
+    '볕': { tier: 4, name: '영웅', desc: "방어 매우 까다로움", tag: '볕', defense: '볕뉘, 볕누리' },
+    '값': { tier: 3, name: '희귀', desc: "유도 단어", tag: '값', defense: '값어치, 값지다, 값표' },
+    '켓': { tier: 3, name: '희귀', desc: "방어 매우 까다로움", tag: '켓', defense: '켓잔뎅이, 켓, 켓밸브' },
+    '틈': { tier: 3, name: '희귀', desc: "방어 유도", tag: '틈', defense: '틈새, 틈바구니, 틈새라면' },
+    '둑': { tier: 3, name: '희귀', desc: "방어 유도", tag: '둑', defense: '둑길, 둑새, 둑새풀' },
+    '름': { tier: 3, name: '희귀', desc: "두음법칙 변수", tag: '름', defense: '름름하다, 름료' },
+    '즘': { tier: 3, name: '희귀', desc: "방어 매우 까다로움", tag: '즘', defense: '즘게(옛말)' },
+    '꾼': { tier: 3, name: '희귀', desc: "사실상 한방", tag: '꾼', defense: '꾼다(동사)' },
+    '턴': { tier: 3, name: '희귀', desc: "방어 유도", tag: '턴', defense: '턴테이블, 턴오버, 턴제' },
+    '삯': { tier: 3, name: '희귀', desc: "방어 유도", tag: '삯', defense: '삯일, 삯바느질, 삯메기' }
+};
+var WORD_DATABASE = null, isDownloading = false, DICT_CACHE = {}, isDownloadingAll = false;
+function fetchWebText(url) {
+    try {
+        if (typeof Utils !== 'undefined' && Utils.getWebText) {
+            var txt = Utils.getWebText(url);
+            if (txt && txt.trim()) return txt.trim();
+        }
+    } catch (e) {}
+    return null;
+}
+function loadDatabase() {
+    if (WORD_DATABASE && WORD_DATABASE.length > 0) return true;
+    if (isDownloading) return false;
+    isDownloading = true;
+    try {
+        var json = fetchWebText(DB_URL);
+        if (json) { WORD_DATABASE = JSON.parse(json); isDownloading = false; return true; }
+    } catch (e) {}
+    isDownloading = false;
+    return false;
+}
+function loadChosungDict(chosung) {
+    if (DICT_CACHE[chosung]) return DICT_CACHE[chosung];
+    if (isDownloadingAll) return null;
+    isDownloadingAll = true;
+    try {
+        var text = fetchWebText(BASE_DICT_URL + encodeURIComponent(chosung) + ".txt");
+        if (text) {
+            DICT_CACHE[chosung] = "\n" + text.replace(/\r/g, "") + "\n";
+            isDownloadingAll = false;
+            return DICT_CACHE[chosung];
+        }
+    } catch (e) {}
+    isDownloadingAll = false;
+    return null;
+}
+function response(room, msg, sender, isGroupChat, replier, imageDB, packageName) {
+    msg = msg.trim();
+    if (!msg.startsWith('/') && !msg.startsWith('!')) return;
+    var prefix = msg.charAt(0), cmdLine = msg.substring(1).trim(), spaceIdx = cmdLine.indexOf(' ');
+    var cmd = spaceIdx !== -1 ? cmdLine.substring(0, spaceIdx).trim() : cmdLine;
+    var param = spaceIdx !== -1 ? cmdLine.substring(spaceIdx + 1).trim() : '';
+    var readMore = (function() { var s = ""; for (var i = 0; i < 500; i++) { s += "\u200b"; } return s; })();
+    
+    if (cmd === '도움말' || cmd === 'help') {
+        replier.reply([
+            "🏆 [끝말잇기 봇 도움말]", "방어 불가 한방단어를 알려주는 비서봇입니다.", "", "📌 명령어:",
+            "1. " + prefix + "도움말 : 도움말 확인",
+            "2. " + prefix + "검색 <글자/자음> : 단어 검색 (예: " + prefix + "검색 가)",
+            "3. " + prefix + "단어 <단어> : 끝말잇기 사용 판정 (예: " + prefix + "단어 가돌리늄)",
+            "4. " + prefix + "분석 <단어> : 끝글자 공격력 분석",
+            "5. " + prefix + "도감 [글자] : 한방 끝글자 정보 확인",
+            "6. " + prefix + "추천 : 무작위 단어 3개 추천",
+            "7. " + prefix + "업데이트 : 단어 정보 서버 동기화", "",
+            "💡 상세 검색 결과는 '전체보기' 내부에 표시됩니다.", "",
+            "copyright\u24b8 H.\u2362\u20dd\u2764\ufe0f \u2364\u20dd\ud83c\udf4b\u2365\u20dd\ud83c\udf70 \u2363\u20dd\ud83e\uddca All Right Reserved."
+        ].join('\n'));
+    }
+    else if (cmd === '업데이트') {
+        replier.reply("🔄 웹 서버에서 최신 단어 데이터베이스를 다운로드합니다...");
+        WORD_DATABASE = null; DICT_CACHE = {};
+        if (loadDatabase()) {
+            replier.reply("✅ 업데이트 완료! 핵심 단어 " + WORD_DATABASE.length + "개와 분할 사전 연동이 완료되었습니다.");
+        } else {
+            replier.reply("❌ 업데이트 실패. 인터넷 연결을 확인하세요.");
+        }
+    }
+    else {
+        if (!WORD_DATABASE || WORD_DATABASE.length === 0) {
+            if (!loadDatabase()) {
+                replier.reply("⚠️ 데이터베이스 로딩 중입니다. 잠시 후 다시 입력해 주세요. (혹은 " + prefix + "업데이트)");
+                return;
+            }
+        }
+        if (cmd === '검색') {
+            if (!param) { replier.reply("⚠️ 검색어를 입력하세요. 예: " + prefix + "검색 가"); return; }
+            var results = filterWords(param.toLowerCase());
+            if (results.length === 0) {
+                var rule = ATTACK_RULES[param];
+                replier.reply(rule && rule.defense ? "❌ '" + param + "' 매칭 단어 없음\n\n💡 대응 반박 단어:\n" + rule.defense : "❌ '" + param + "' 매칭 단어 없음");
+                return;
+            }
+            results.sort(function(a, b) { return b.tier !== a.tier ? b.tier - a.tier : (a.word > b.word ? 1 : -1); });
+            var title = "🔍 [검색 결과]\n'" + param + "' 검색 결과 (총 " + results.length + "개):";
+            var body = "\n" + readMore + "\n";
+            results.forEach(function(item, idx) {
+                var star = ""; for (var s = 0; s < item.tier; s++) { star += "⭐"; }
+                body += (idx + 1) + ". " + item.word + " (" + getTierName(item.tier) + " " + star + ")\n   뜻: " + item.definition + "\n\n";
+            });
+            var rule = ATTACK_RULES[param];
+            if (rule && rule.defense) { body += "\n----------\n💡 ['" + param + "'] 대응 반박 단어:\n" + rule.defense + "\n"; }
+            replier.reply(title + body.trim());
+        }
+        else if (cmd === '단어' || cmd === '단어검색') {
+            if (!param) { replier.reply("⚠️ 검색할 단어를 입력하세요. 예: " + prefix + "단어 가돌리늄"); return; }
+            var word = param.trim();
+            if (!/^[가-힣]+$/.test(word)) { replier.reply("⚠️ 한글 단어만 입력해 주세요."); return; }
+            var chosung = getChosung(word.charAt(0));
+            var dictText = loadChosungDict(chosung);
+            if (!dictText) { replier.reply("⚠️ 사전 데이터 로딩 중입니다. 잠시 후 다시 시도하세요."); return; }
+            
+            var cleanWord = word.toLowerCase(), exists = (dictText.indexOf("\n" + cleanWord + "\n") !== -1);
+            var msgOut = "🧐 [" + word + "] 끝말잇기 사용성 판정\n\n";
+            
+            if (exists) {
+                var matched = null;
+                for (var i = 0; i < WORD_DATABASE.length; i++) {
+                    if (WORD_DATABASE[i].word.toLowerCase() === cleanWord) { matched = WORD_DATABASE[i]; break; }
+                }
+                if (matched) {
+                    var star = ""; for (var s = 0; s < matched.tier; s++) { star += "⭐"; }
+                    msgOut += "✅ 판정: [사용 가능 (필승 한방단어)]\n▶ 등급: " + getTierName(matched.tier) + " (" + star + ")\n▶ 뜻: " + matched.definition + "\n\n💡 족보에 등록된 필승 한방단어입니다.";
+                } else {
+                    var last = word.slice(-1), rule = ATTACK_RULES[last];
+                    if (rule) {
+                        var star = ""; for (var s = 0; s < rule.tier; s++) { star += "⭐"; }
+                        msgOut += "✅ 판정: [사용 가능 (일반 단어 - 한방 유력)]\n▶ 설명: 사전 등록 단어이며 끝글자 [" + last + "]가 한방 끝글자(" + rule.name + " " + star + ")에 속해 실전 한방 카드로 적합합니다.";
+                    } else {
+                        msgOut += "✅ 판정: [사용 가능 (일반 단어)]\n▶ 설명: 사전에 등록된 유효 단어이며 상대방이 쉽게 방어할 수 있습니다.";
+                    }
+                }
+            } else {
+                var last = word.slice(-1), rule = ATTACK_RULES[last];
+                msgOut += "❌ 판정: [사용 불가 (사전 미등록)]\n▶ 설명: 끄글/끄투 공식 단어장에 없는 단어입니다.\n\n";
+                msgOut += rule ? "💡 참고: 끝글자 [" + last + "]가 한방 규칙에 속하나 사전 미등록으로 게임 내 거부될 수 있습니다." : "💡 올바른 단어를 사용해 주세요.";
+            }
+            replier.reply(msgOut);
+        }
+        else if (cmd === '분석') {
+            if (!param) { replier.reply("⚠️ 분석할 단어를 입력하세요. 예: " + prefix + "분석 리튬"); return; }
+            var word = param.trim();
+            if (!/^[가-힣]+$/.test(word)) { replier.reply("⚠️ 한글 단어만 입력해 주세요."); return; }
+            var last = word.slice(-1), rule = ATTACK_RULES[last];
+            var msgOut = "🧐 [" + word + "] 실시간 공격력 분석\n\n";
+            if (rule) {
+                var star = ""; for (var s = 0; s < rule.tier; s++) { star += "⭐"; }
+                msgOut += "▶ 마지막 글자: [" + last + "]\n▶ 판정 등급: " + rule.name + " (" + star + ")\n▶ 상세 분석: " + rule.desc + "\n\n💡 게임 오버 확률이 극도로 높습니다.";
+            } else {
+                msgOut += "▶ 마지막 글자: [" + last + "]\n▶ 판정 등급: 일반 단어 (방어 가능)\n▶ 상세 분석: '" + last + "'로 시작하는 표준어가 존재하여 방어 가능합니다.";
+            }
+            replier.reply(msgOut);
+        }
+        else if (cmd === '도감') {
+            if (param) {
+                var char = param.trim(), rule = ATTACK_RULES[char];
+                if (!rule) { replier.reply("❌ '" + char + "'은 등록된 한방 끝글자가 아닙니다."); return; }
+                var star = ""; for (var s = 0; s < rule.tier; s++) { star += "⭐"; }
+                var msgOut = "📖 [한방 끝글자 도감 - " + char + "]\n\n▶ 등급: " + rule.name + " (" + star + ")\n▶ 설명: " + rule.desc + "\n\n";
+                var ex = [];
+                for (var e = 0; e < WORD_DATABASE.length; e++) {
+                    if (WORD_DATABASE[e].endChar === char) ex.push(WORD_DATABASE[e].word);
+                }
+                if (ex.length > 0) msgOut += "💡 대표 예시: " + ex.slice(0, 8).join(', ');
+                replier.reply(msgOut);
+            } else {
+                var title = "📖 [끝글자 공격 도감 전체 목록]", body = "\n" + readMore + "\n";
+                var sorted = Object.keys(ATTACK_RULES).map(function(k) { return { k: k, r: ATTACK_RULES[k] }; })
+                                    .sort(function(a, b) { return b.r.tier !== a.r.tier ? b.r.tier - a.r.tier : (a.k > b.k ? 1 : -1); });
+                sorted.forEach(function(item) {
+                    var star = ""; for (var s = 0; s < item.r.tier; s++) { star += "⭐"; }
+                    body += "[" + item.k + "] - " + item.r.name + " (" + star + ")\n설명: " + item.r.desc + "\n\n";
+                });
+                replier.reply(title + body.trim());
+            }
+        }
+        else if (cmd === '추천') {
+            var shuffled = WORD_DATABASE.slice().sort(function() { return 0.5 - Math.random(); });
+            var selected = shuffled.slice(0, 3), msgOut = "🎲 [오늘의 추천 필승 한방단어]\n\n";
+            selected.forEach(function(item, idx) {
+                var star = ""; for (var s = 0; s < item.tier; s++) { star += "⭐"; }
+                msgOut += (idx + 1) + ". " + item.word + " (" + getTierName(item.tier) + " " + star + ")\n   뜻: " + item.definition + "\n\n";
+            });
+            replier.reply(msgOut.trim());
+        }
+    }
+}
+var HANGUL_START = 0xAC00, HANGUL_END = 0xD7A3;
+var CHOSUNG_LIST = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+function getChosung(char) {
+    var code = char.charCodeAt(0);
+    if (code >= HANGUL_START && code <= HANGUL_END) {
+        return CHOSUNG_LIST[Math.floor((code - HANGUL_START) / 588)];
+    }
+    return char;
+}
+function filterWords(searchQuery) {
+    var query = searchQuery.trim().toLowerCase();
+    if (!query) return [];
+    return WORD_DATABASE.filter(function(item) {
+        var wordClean = item.word.trim().toLowerCase(), firstChar = wordClean.charAt(0);
+        if (query.length === 1 && CHOSUNG_LIST.indexOf(query) !== -1) {
+            return getChosung(firstChar) === query;
+        }
+        return wordClean.indexOf(query) === 0;
+    });
+}
+function getTierName(tier) {
+    if (tier === 5) return '전설';
+    if (tier === 4) return '영웅';
+    if (tier === 3) return '희귀';
+    return '보통';
+}
