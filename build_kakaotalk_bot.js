@@ -48,9 +48,8 @@ var DICT_CACHE = {};
 var isDownloadingAll = false;
 var BASE_DICT_URL = "https://ghhwang314.github.io/shiritori-helper/dict/";
 
-// 3. 웹 텍스트 다운로드 헬퍼 함수 (3중 백업 지원)
+// 3. 웹 텍스트 다운로드 헬퍼 함수 (공식 SDK API 단독 사용으로 컴파일러 에러 방지)
 function fetchWebText(urlStr) {
-    // 1단계: 메신저봇R 내장 Utils 사용 (가장 안전하고 호환성 높음)
     try {
         if (typeof Utils !== 'undefined' && Utils.getWebText) {
             var utilsText = Utils.getWebText(urlStr);
@@ -58,49 +57,9 @@ function fetchWebText(urlStr) {
                 return utilsText.trim();
             }
         }
-    } catch (e1) {
-        // 실패 시 다음 단계로 진행
+    } catch (err) {
+        // 실패 시 null 반환
     }
-
-    // 2단계 백업: Jsoup 라이브러리 사용 (org 패키지가 존재할 경우)
-    try {
-        if (typeof org !== 'undefined' && org.jsoup && org.jsoup.Jsoup) {
-            var jsoupText = org.jsoup.Jsoup.connect(urlStr)
-                .ignoreContentType(true)
-                .maxBodySize(0)
-                .timeout(8000)
-                .execute()
-                .body();
-            if (jsoupText && jsoupText.trim()) {
-                return jsoupText.trim();
-            }
-        }
-    } catch (e2) {
-        // 실패 시 다음 단계로 진행
-    }
-
-    // 3단계 백업: Java 표준 URLConnection 사용 (엔진 종류 상관없이 100% 작동)
-    try {
-        var url = new java.net.URL(urlStr);
-        var conn = url.openConnection();
-        conn.setRequestMethod("GET");
-        conn.setConnectTimeout(8000);
-        conn.setReadTimeout(8000);
-        
-        var reader = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream(), "UTF-8"));
-        var line;
-        var result = "";
-        while ((line = reader.readLine()) !== null) {
-            result += line + "\\n";
-        }
-        reader.close();
-        if (result && result.trim()) {
-            return result.trim();
-        }
-    } catch (e3) {
-        // 실패
-    }
-
     return null;
 }
 
