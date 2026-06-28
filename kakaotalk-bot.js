@@ -66,23 +66,13 @@ var BASE_DICT_URL = "https://ghhwang314.github.io/shiritori-helper/dict/";
 
 // 3. 웹 텍스트 다운로드 헬퍼 함수 (3중 백업 지원)
 function fetchWebText(urlStr) {
-    // 1단계 백업: Java 표준 URLConnection 사용 (엔진 종류 상관없이 100% 작동)
+    // 1단계: 메신저봇R 내장 Utils 사용 (가장 안전하고 호환성 높음)
     try {
-        var url = new java.net.URL(urlStr);
-        var conn = url.openConnection();
-        conn.setRequestMethod("GET");
-        conn.setConnectTimeout(8000);
-        conn.setReadTimeout(8000);
-        
-        var reader = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream(), "UTF-8"));
-        var line;
-        var result = "";
-        while ((line = reader.readLine()) !== null) {
-            result += line + "\n";
-        }
-        reader.close();
-        if (result && result.trim()) {
-            return result.trim();
+        if (typeof Utils !== 'undefined' && Utils.getWebText) {
+            var utilsText = Utils.getWebText(urlStr);
+            if (utilsText && utilsText.trim()) {
+                return utilsText.trim();
+            }
         }
     } catch (e1) {
         // 실패 시 다음 단계로 진행
@@ -105,13 +95,23 @@ function fetchWebText(urlStr) {
         // 실패 시 다음 단계로 진행
     }
 
-    // 3단계 백업: 메신저봇R 내장 Utils 사용
+    // 3단계 백업: Java 표준 URLConnection 사용 (엔진 종류 상관없이 100% 작동)
     try {
-        if (typeof Utils !== 'undefined' && Utils.getWebText) {
-            var utilsText = Utils.getWebText(urlStr);
-            if (utilsText && utilsText.trim()) {
-                return utilsText.trim();
-            }
+        var url = new java.net.URL(urlStr);
+        var conn = url.openConnection();
+        conn.setRequestMethod("GET");
+        conn.setConnectTimeout(8000);
+        conn.setReadTimeout(8000);
+        
+        var reader = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream(), "UTF-8"));
+        var line;
+        var result = "";
+        while ((line = reader.readLine()) !== null) {
+            result += line + "\n";
+        }
+        reader.close();
+        if (result && result.trim()) {
+            return result.trim();
         }
     } catch (e3) {
         // 실패
