@@ -97,6 +97,11 @@ body {
     }
 }
 
+/* 유틸리티 클래스 */
+.hidden {
+    display: none !important;
+}
+
 /* 스크롤바 커스텀 */
 .scrollable-area::-webkit-scrollbar {
     width: 8px;
@@ -2052,6 +2057,42 @@ body {
     transform: translateX(20px);
 }
 
+/* Classic HP Hearts styling */
+.classic-hp-hearts {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+    justify-content: flex-start;
+}
+
+#classic-p2-card .classic-hp-hearts {
+    justify-content: flex-end;
+}
+
+.heart-icon {
+    font-size: 1.25rem;
+    display: inline-block;
+    transition: transform 0.2s ease-in-out;
+    filter: drop-shadow(0 0 4px rgba(236, 72, 153, 0.4));
+}
+
+.heart-icon.filled {
+    animation: heartBeat 1.5s infinite ease-in-out;
+}
+
+.heart-icon.empty {
+    opacity: 0.35;
+    filter: grayscale(100%) contrast(0.5);
+    transform: scale(0.9);
+}
+
+@keyframes heartBeat {
+    0% { transform: scale(1); }
+    30% { transform: scale(1.15); }
+    60% { transform: scale(1); }
+    100% { transform: scale(1); }
+}
+
 /* Game Arena timer */
 .classic-timer-container {
     width: 100%;
@@ -2296,6 +2337,291 @@ body {
         border-radius: 12px;
     }
 }
+
+/* ========================================================
+   📱 모바일 디바이스 초정밀 최적화 (뷰포트 768px 이하)
+   ======================================================== */
+@media (max-width: 768px) {
+    /* 기본 레이아웃 여백 최적화 */
+    .container {
+        padding: 0.8rem 0.5rem;
+        gap: 1rem;
+    }
+
+    .classic-game-container, .rpg-simulator-container {
+        padding: 1rem !important;
+        margin-bottom: 1rem;
+    }
+
+    /* 6개나 되는 탭 바를 가로 스크롤로 가볍고 우아하게 전환 */
+    .tabs {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+        width: 100%;
+        gap: 0.4rem !important;
+        padding-bottom: 0.5rem;
+        scrollbar-width: none; /* Firefox */
+    }
+    .tabs::-webkit-scrollbar {
+        display: none; /* Chrome, Safari */
+    }
+    .tab-btn {
+        flex-shrink: 0 !important;
+        white-space: nowrap !important;
+        padding: 0.5rem 0.8rem !important;
+        font-size: 0.88rem !important;
+        border-radius: 20px !important;
+    }
+
+    /* 초성 퀵패널 스티키 헤더화 (스크롤 시 상단 고정으로 모바일 접근성 극대화) */
+    .consonant-quick-search {
+        position: sticky;
+        top: 0.5rem;
+        z-index: 100;
+        background: rgba(10, 13, 20, 0.95) !important;
+        backdrop-filter: blur(12px) !important;
+        -webkit-backdrop-filter: blur(12px) !important;
+        padding: 0.6rem 0.8rem !important;
+        border-radius: 12px !important;
+        border: 1px solid rgba(139, 92, 246, 0.2) !important;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+    }
+    .quick-consonants-wrapper {
+        gap: 0.3rem !important;
+    }
+    .consonant-grid {
+        padding-bottom: 0.2rem !important;
+    }
+
+    /* 아레나 헤더 세로 스택을 양옆 카드 배치로 변경 (세로 공간 150px 이상 절약) */
+    .arena-header {
+        flex-direction: row !important;
+        padding: 0.75rem !important;
+        gap: 0.4rem !important;
+        border-radius: 12px !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+    }
+
+    .arena-player-card {
+        flex: 1 !important;
+        gap: 0.3rem !important;
+    }
+
+    .player-meta {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 0.1rem !important;
+    }
+
+    #classic-p2-card .player-meta, #arena-opponent .player-meta {
+        align-items: flex-end !important;
+    }
+
+    .arena-job-name {
+        font-size: 0.85rem !important;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow: hidden;
+        max-width: 80px;
+    }
+
+    .player-label {
+        font-size: 0.65rem !important;
+        padding: 0.1rem 0.35rem !important;
+    }
+
+    .turn-indicator {
+        min-width: 50px !important;
+        gap: 0.1rem !important;
+    }
+
+    .turn-count {
+        font-size: 0.75rem !important;
+    }
+
+    .turn-active-arrow {
+        font-size: 1rem !important;
+    }
+
+    .hp-bar-wrapper {
+        height: 12px !important;
+    }
+
+    .hp-text {
+        font-size: 0.65rem !important;
+        line-height: 12px !important;
+    }
+
+    .classic-hp-hearts {
+        gap: 0.15rem !important;
+    }
+
+    .heart-icon {
+        font-size: 0.9rem !important;
+    }
+
+    /* 채팅 및 로그 화면 높이 축소로 한눈에 정보 파악 가능화 */
+    .classic-chat-screen {
+        height: 250px !important;
+        padding: 0.6rem !important;
+    }
+
+    .battle-log-screen {
+        height: 250px !important;
+        padding: 0.6rem !important;
+    }
+
+    /* 배틀/클래식 입력창 및 액션 버튼 최적화 */
+    .battle-input-area {
+        padding: 0.5rem 0.75rem !important;
+        gap: 0.5rem !important;
+        border-radius: 8px !important;
+    }
+
+    .input-prefix-label {
+        font-size: 0.85rem !important;
+    }
+
+    #classic-word-input, #battle-word-input {
+        font-size: 1rem !important; /* iOS 자동 줌 방지 최소 16px */
+    }
+
+    .battle-actions-row {
+        flex-wrap: wrap !important;
+        gap: 0.4rem !important;
+        margin-top: 0.75rem !important;
+    }
+
+    .battle-actions-row .action-btn {
+        flex: 1 1 45% !important;
+        padding: 0.6rem 0.8rem !important;
+        font-size: 0.8rem !important;
+        border-radius: 8px !important;
+    }
+
+    .battle-tips {
+        width: 100% !important;
+        text-align: center !important;
+        font-size: 0.75rem !important;
+        margin-top: 0.2rem !important;
+    }
+
+    /* 모달 팝업 내부 모바일 최적화 */
+    .modal-content {
+        padding: 1.2rem !important;
+        width: 95% !important;
+        max-height: 90vh !important;
+    }
+
+    .job-option-card {
+        gap: 0.75rem !important;
+        padding: 0.75rem !important;
+        border-radius: 10px !important;
+    }
+
+    .job-option-avatar {
+        font-size: 1.5rem !important;
+        width: 44px !important;
+        height: 44px !important;
+    }
+
+    .job-option-info h4 {
+        font-size: 0.95rem !important;
+    }
+
+    .job-option-info p {
+        font-size: 0.78rem !important;
+    }
+
+    .setup-card {
+        min-height: 180px !important;
+        padding: 1rem !important;
+    }
+
+    .job-avatar {
+        font-size: 2.2rem !important;
+        width: 60px !important;
+        height: 60px !important;
+    }
+}
+
+/* 배틀 인벤토리 & 액티브 스킬 패널 */
+.battle-inventory-panel {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.inventory-stats {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.stat-item {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 0.4rem 0.8rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.stat-item strong {
+    color: var(--accent-cyan);
+    font-size: 1rem;
+}
+
+.inventory-actions {
+    display: flex;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+}
+
+.skill-action-btn {
+    flex: 1;
+    min-width: 140px;
+    padding: 0.6rem 1rem;
+    background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+.skill-action-btn#btn-eat-burger {
+    background: linear-gradient(135deg, var(--tier-4), var(--tier-5));
+}
+
+.skill-action-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(99, 102, 241, 0.3);
+}
+
+.skill-action-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.skill-action-btn:disabled {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-muted);
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
 
 
 

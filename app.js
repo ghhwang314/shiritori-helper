@@ -75806,6 +75806,7 @@ function initEvents() {
         tabAll.classList.add('active');
         currentTab = 'all';
         renderWordList();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
     tabLure.addEventListener('click', () => {
@@ -75814,6 +75815,7 @@ function initEvents() {
         tabLure.classList.add('active');
         currentTab = 'lure';
         renderWordList();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
     tabFav.addEventListener('click', () => {
@@ -75822,6 +75824,7 @@ function initEvents() {
         tabFav.classList.add('active');
         currentTab = 'favorites';
         renderWordList();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
     // 실시간 분석기 작동
@@ -75989,6 +75992,7 @@ function initRpgSimulator() {
         if (!isBattleRunning) {
             resetBattleSetup();
         }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
     tabCodex.addEventListener('click', () => {
@@ -75997,6 +76001,7 @@ function initRpgSimulator() {
         hidePanels([wordListSection, searchSection, loadMoreWrapper, sortingWrapper, rpgPanel, classicPanel]);
         currentTab = 'codex';
         renderJobCodex();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
     // 기존 단어 리스트 탭 클릭 시 타 패널 숨기기
@@ -76006,6 +76011,7 @@ function initRpgSimulator() {
             tab.classList.add('active');
             showPanels([wordListSection, searchSection, loadMoreWrapper, sortingWrapper]);
             hidePanels([rpgPanel, codexPanel, classicPanel]);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         });
     });
 
@@ -76034,6 +76040,11 @@ function initRpgSimulator() {
             handleBattleSubmit();
         }
     });
+
+    // 액티브 스킬 버튼 바인딩
+    document.getElementById('btn-buy-stock').addEventListener('click', buyStock);
+    document.getElementById('btn-sell-stock').addEventListener('click', sellStock);
+    document.getElementById('btn-eat-burger').addEventListener('click', eatBurger);
 }
 
 function setActiveTabBtn(activeBtn) {
@@ -76175,6 +76186,7 @@ function startBattleGame() {
     
     document.getElementById('battle-word-input').value = '';
     document.getElementById('battle-word-input').focus();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function updateArenaUI() {
@@ -76223,6 +76235,7 @@ function updateArenaUI() {
     } else {
         document.getElementById('battle-input-prefix').textContent = '시작글자: 자유';
     }
+    updateInventoryUI();
 }
 
 // 플레이어가 단어 제출 시 작동
@@ -76299,6 +76312,15 @@ function handleBattleSubmit() {
         return;
     }
 
+    // 골드 획득 및 주가 변동 처리
+    const earnedGold = word.length * 5;
+    battleState.playerGold += earnedGold;
+    addLogRow('sys', `💰 단어 제출 보상: +${earnedGold}골드를 획득했습니다.`);
+
+    const change = Math.floor((Math.random() - 0.45) * 30);
+    battleState.stockPrice = Math.max(10, battleState.stockPrice + change);
+    addLogRow('sys', `📈 [주식시장] 주가 변동: 현재가 ${battleState.stockPrice}골드 (변동: ${change >= 0 ? '+' : ''}${change})`);
+
     // 9. 턴 체인지 및 상대방 AI 차례 실행
     battleState.prefixChar = lastChar;
     battleState.currentTurn = 'opponent';
@@ -76373,10 +76395,15 @@ function opponentTurnAI() {
     const hasRule = ATTACK_RULES[lastChar];
     
     if (hasRule) {
-        // 유저가 게살버거 스킬 등으로 골드를 벌어 쉴드를 산 경우 대입 가능하나 간단히 대미지 대조
-        battleState.playerHp -= 1;
-        triggerShakeEffect();
-        addLogRow('dmg', `💥 AI의 한방 공격 적중! 끝글자가 [${lastChar}]이므로 플레이어의 라이프가 1개 깎였습니다!`);
+        // 플레이어가 주식투자자 스킬로 방패를 두르고 있는지 검사
+        if (battleState.playerJob.id === 'INVESTOR' && battleState.shares >= 3) {
+            battleState.shares -= 3;
+            addLogRow('skill', `🛡️ [주식투자자] 효과로 주식 3주를 자동 매각하여 AI의 한방 대미지를 무효화했습니다! (남은 주식: ${battleState.shares}주)`);
+        } else {
+            battleState.playerHp -= 1;
+            triggerShakeEffect();
+            addLogRow('dmg', `💥 AI의 한방 공격 적중! 끝글자가 [${lastChar}]이므로 플레이어의 라이프가 1개 깎였습니다!`);
+        }
     }
 
     // 게임 오버 검사
@@ -76384,6 +76411,14 @@ function opponentTurnAI() {
         endBattleGame('opponent');
         return;
     }
+
+    // 생존 골드 보상 및 주가 변동 처리
+    battleState.playerGold += 10;
+    addLogRow('sys', `💰 라운드 생존 보상: +10골드를 획득했습니다.`);
+
+    const change = Math.floor((Math.random() - 0.45) * 30);
+    battleState.stockPrice = Math.max(10, battleState.stockPrice + change);
+    addLogRow('sys', `📈 [주식시장] 주가 변동: 현재가 ${battleState.stockPrice}골드 (변동: ${change >= 0 ? '+' : ''}${change})`);
 
     // 플레이어 턴으로 교체
     battleState.prefixChar = lastChar;
@@ -76447,6 +76482,89 @@ function triggerShakeEffect() {
     }, 450);
 }
 
+// 인벤토리 및 스킬 UI 업데이트
+function updateInventoryUI() {
+    if (!battleState) return;
+
+    // 골드 표시 업데이트
+    const goldText = document.getElementById('player-gold-text');
+    if (goldText) {
+        goldText.textContent = `${battleState.playerGold} Gold`;
+    }
+
+    // 주식투자자 스킬 UI 활성화/비활성화 및 현황 표시
+    const investorSkills = document.getElementById('investor-skills');
+    if (investorSkills) {
+        if (battleState.playerJob && battleState.playerJob.id === 'INVESTOR') {
+            investorSkills.classList.remove('hidden');
+            document.getElementById('current-stock-price').textContent = battleState.stockPrice;
+            document.getElementById('owned-shares').textContent = battleState.shares;
+
+            const buyBtn = document.getElementById('buy-stock-btn');
+            const sellBtn = document.getElementById('sell-stock-btn');
+
+            if (buyBtn) buyBtn.disabled = (battleState.playerGold < battleState.stockPrice || battleState.currentTurn !== 'player');
+            if (sellBtn) sellBtn.disabled = (battleState.shares <= 0 || battleState.currentTurn !== 'player');
+        } else {
+            investorSkills.classList.add('hidden');
+        }
+    }
+
+    // 쉐프 스킬 UI 활성화/비활성화 및 구매 비용 표시
+    const chefSkills = document.getElementById('chef-skills');
+    if (chefSkills) {
+        if (battleState.playerJob && battleState.playerJob.id === 'CHEF') {
+            chefSkills.classList.remove('hidden');
+            const burgerBtn = document.getElementById('eat-burger-btn');
+            if (burgerBtn) {
+                burgerBtn.disabled = (battleState.playerGold < 30 || battleState.currentTurn !== 'player');
+            }
+        } else {
+            chefSkills.classList.add('hidden');
+        }
+    }
+}
+
+// 주식 매수
+function buyStock() {
+    if (!battleState || battleState.currentTurn !== 'player') return;
+    if (battleState.playerGold >= battleState.stockPrice) {
+        battleState.playerGold -= battleState.stockPrice;
+        battleState.shares += 1;
+        addLogRow('skill', `📈 주식 1주를 ${battleState.stockPrice}골드에 매수했습니다! (보유 주식: ${battleState.shares}주)`);
+        updateInventoryUI();
+    } else {
+        showToast('골드가 부족합니다!', true);
+    }
+}
+
+// 주식 매도
+function sellStock() {
+    if (!battleState || battleState.currentTurn !== 'player') return;
+    if (battleState.shares > 0) {
+        battleState.playerGold += battleState.stockPrice;
+        battleState.shares -= 1;
+        addLogRow('skill', `📉 주식 1주를 ${battleState.stockPrice}골드에 매도했습니다! (보유 주식: ${battleState.shares}주)`);
+        updateInventoryUI();
+    } else {
+        showToast('보유한 주식이 없습니다!', true);
+    }
+}
+
+// 게살버거 먹기 (라이프 +1 회복)
+function eatBurger() {
+    if (!battleState || battleState.currentTurn !== 'player') return;
+    if (battleState.playerGold >= 30) {
+        battleState.playerGold -= 30;
+        battleState.playerHp = Math.min(3, battleState.playerHp + 1);
+        addLogRow('skill', `🍔 맛있는 [게살버거]를 제작하여 섭취했습니다! 라이프가 1개 회복되었습니다. (현재 라이프: ${battleState.playerHp}/3)`);
+        updateArenaUI();
+    } else {
+        showToast('골드가 부족합니다! (게살버거 가격: 30골드)', true);
+    }
+}
+
+
 // 대결 종료
 function endBattleGame(winner) {
     isBattleRunning = false;
@@ -76467,9 +76585,27 @@ function endBattleGame(winner) {
 }
 
 function giveupBattleGame() {
-    if (confirm('정말로 기권하시겠습니까?')) {
-        endBattleGame('opponent');
-        setTimeout(resetBattleSetup, 1500);
+    if (!isBattleRunning) return;
+    
+    if (confirm('정말로 이번 라운드를 포기하시겠습니까?\n(라이프가 1개 감소하고 새로운 무작위 글자로 상대방 차례부터 재시작합니다.)')) {
+        battleState.playerHp -= 1;
+        triggerShakeEffect();
+        addLogRow('dmg', `🏳️ 플레이어가 라운드를 포기하여 라이프가 1개 감소했습니다!`);
+        
+        if (battleState.playerHp <= 0) {
+            endBattleGame('opponent');
+            return;
+        }
+
+        // 새로운 무작위 글자로 시작하게 턴 리셋
+        const randomStarts = ['가', '나', '다', '사', '아', '자', '하'];
+        battleState.prefixChar = randomStarts[Math.floor(Math.random() * randomStarts.length)];
+        addLogRow('sys', `💡 새로운 시작 글자 [${battleState.prefixChar}]로 AI 상대방 차례가 시작됩니다.`);
+        
+        battleState.currentTurn = 'opponent';
+        updateArenaUI();
+        
+        setTimeout(opponentTurnAI, 1500);
     }
 }
 
@@ -76717,7 +76853,12 @@ function initClassicGame() {
         currentTab = 'classic';
         if (!classicState.isGameRunning) {
             resetClassicSetupUI();
+            const onlineBtn = document.getElementById('mode-online');
+            if (onlineBtn) {
+                onlineBtn.click();
+            }
         }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
     // 모드 셀렉터 바인딩
@@ -76772,11 +76913,60 @@ function initClassicGame() {
     // 시작 및 기권/다시하기 버튼
     document.getElementById('start-classic-game-btn').addEventListener('click', startClassicGame);
     document.getElementById('classic-giveup-btn').addEventListener('click', () => {
-        if (confirm('정말로 기권하시겠습니까?')) {
-            if (classicState.mode === 'online' && classicConn) {
-                sendP2PMessage({ type: 'GIVEUP' });
+        if (!classicState.isGameRunning) return;
+        
+        // 온라인 모드인 경우, 내 턴일 때만 기권(라운드 포기) 가능
+        if (classicState.mode === 'online' && classicState.currentTurn !== 'player1') {
+            showToast('상대방 턴에는 라운드를 포기할 수 없습니다.', true);
+            return;
+        }
+
+        const activePlayer = classicState.currentTurn; // 'player1' or 'player2'
+        const activeName = (activePlayer === 'player1') ? classicState.p1Name : classicState.p2Name;
+
+        if (confirm(`정말로 이번 라운드를 포기하시겠습니까?\n(${activeName}의 목숨이 1 감소하고 다음 차례로 넘어갑니다.)`)) {
+            clearInterval(classicState.timerInterval);
+            
+            if (activePlayer === 'player1') {
+                classicState.p1Hp -= 1;
+            } else {
+                classicState.p2Hp -= 1;
             }
-            endClassicGame('opponent', '기권');
+            updateClassicHpUI();
+            
+            addClassicChatBubble('system', `🏳️ ${activeName}가 라운드를 포기하여 목숨이 1 감소했습니다.`, '');
+            
+            if (classicState.p1Hp <= 0) {
+                if (classicState.mode === 'online' && classicConn) {
+                    sendP2PMessage({ 
+                        type: 'GAME_OVER', 
+                        p1Hp: classicState.p1Hp, 
+                        p2Hp: classicState.p2Hp, 
+                        reason: '목숨 모두 소진' 
+                    });
+                }
+                endClassicGame('player2', '목숨 모두 소진');
+            } else if (classicState.p2Hp <= 0) {
+                endClassicGame('player1', '목숨 모두 소진');
+            } else {
+                if (classicState.mode === 'online' && classicConn) {
+                    sendP2PMessage({ 
+                        type: 'ROUND_FAIL', 
+                        p1Hp: classicState.p1Hp, 
+                        p2Hp: classicState.p2Hp,
+                        reason: '기권'
+                    });
+                }
+                classicState.prefixChar = '';
+                
+                // 온라인 모드면 무조건 상대방(player2)에게로 턴 전환
+                // 로컬/싱글인 경우 다음 턴으로 전환
+                const nextTurn = (classicState.mode === 'online') ? 'player2' : 
+                    ((activePlayer === 'player1') ? 'player2' : 'player1');
+                
+                classicState.currentTurn = nextTurn;
+                startClassicTurnCycle();
+            }
         }
     });
     document.getElementById('classic-restart-btn').addEventListener('click', () => {
@@ -76904,7 +77094,7 @@ function joinClassicRoom() {
 function setupP2PConnection() {
     updateConnectionStatus('connecting', '터널 형성 완료. 핸드셰이크 중...');
     
-    classicConn.on('open', () => {
+    const onOpen = () => {
         classicIsConnected = true;
         updateConnectionStatus('connected', '상대방과 실시간 연결되었습니다!');
         
@@ -76929,7 +77119,13 @@ function setupP2PConnection() {
             startBtn.textContent = '방장의 시작을 기다리는 중...';
             toggleClassicOptionsDisable(true);
         }
-    });
+    };
+
+    if (classicConn.open) {
+        onOpen();
+    } else {
+        classicConn.on('open', onOpen);
+    }
     
     classicConn.on('data', (data) => {
         handleP2PMessage(data);
@@ -76977,8 +77173,32 @@ function handleP2PMessage(data) {
             break;
             
         case 'TIMEOUT':
-            // 상대방의 시간 초과로 내가 승리
+            // 상대방의 시간 초과로 내가 승리 (구버전 호환용)
             endClassicGame('player1', '상대방 시간 초과');
+            break;
+            
+        case 'ROUND_FAIL':
+            // 상대방이 시간 초과 또는 라운드를 기권하여 상대 목숨 1 차감됨 (상대 p1Hp -> 내 p2Hp, 상대 p2Hp -> 내 p1Hp)
+            classicState.p1Hp = data.p2Hp;
+            classicState.p2Hp = data.p1Hp;
+            updateClassicHpUI();
+            
+            const msg = data.reason === '기권' ? 
+                `🏳️ 상대방이 라운드를 포기했습니다! 상대방의 목숨이 1 감소했습니다.` : 
+                `⏱️ 상대방 시간 초과! 상대방의 목숨이 1 감소했습니다.`;
+            addClassicChatBubble('system', msg, '');
+            classicState.prefixChar = '';
+            classicState.currentTurn = 'player1'; // 내 턴으로 시작
+            startClassicTurnCycle();
+            break;
+            
+        case 'GAME_OVER':
+            // 상대방이 목숨을 모두 소진하여 대결이 끝남
+            classicState.p1Hp = data.p2Hp;
+            classicState.p2Hp = data.p1Hp;
+            updateClassicHpUI();
+            
+            endClassicGame('player1', data.reason);
             break;
             
         case 'GIVEUP':
@@ -77163,6 +77383,9 @@ function startClassicGame() {
 
 // 실제 아레나 뷰 전환 및 실행
 function executeClassicGameStart() {
+    if (classicIsConnected) {
+        classicState.mode = 'online';
+    }
     classicState.isGameRunning = true;
     classicState.usedWords.clear();
     classicState.turnCount = 1;
@@ -77219,9 +77442,11 @@ function executeClassicGameStart() {
     
     classicState.currentTurn = classicState.startTurn;
     updateClassicArenaUI();
+    updateClassicHpUI();
     
     // 턴 기동
     startClassicTurnCycle();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // 턴 사이클 시작
@@ -77272,8 +77497,18 @@ async function playClassicAITurn() {
     if (wordObj) {
         applyClassicWordSubmission('player2', wordObj.word, wordObj.definition, wordObj.isWinning);
     } else {
-        // AI 기권 (사전에서 찾을 수 없음)
-        endClassicGame('player1', 'AI가 이을 단어를 찾지 못함');
+        // AI 기권 (사전에서 찾을 수 없음) - 목숨 1 감소
+        classicState.p2Hp -= 1;
+        updateClassicHpUI();
+        addClassicChatBubble('system', `❌ AI가 이을 단어를 찾지 못해 기권했습니다! AI의 목숨이 1 감소했습니다.`, '');
+        
+        if (classicState.p2Hp <= 0) {
+            endClassicGame('player1', 'AI 목숨 모두 소진');
+        } else {
+            classicState.prefixChar = '';
+            classicState.currentTurn = 'player1';
+            startClassicTurnCycle();
+        }
     }
 }
 
@@ -77357,16 +77592,55 @@ function applyClassicWordSubmission(sender, word, definition, isWinning) {
 function handleClassicTimeout() {
     if (!classicState.isGameRunning) return;
     
+    const loser = classicState.currentTurn; // 'player1' or 'player2'
+    const winner = (loser === 'player1') ? 'player2' : 'player1';
+    
     if (classicState.mode === 'online') {
-        // 온라인 턴에서 본인 턴일 때만 패배 선언 송출
-        if (classicState.currentTurn === 'player1') {
-            sendP2PMessage({ type: 'TIMEOUT' });
-            endClassicGame('player2', '시간 초과');
+        if (loser === 'player1') {
+            // 본인 턴에서 타임아웃 발생 -> 본인 목숨 차감 및 패킷 송출
+            classicState.p1Hp -= 1;
+            updateClassicHpUI();
+            addClassicChatBubble('system', `⏱️ 시간 초과! ${classicState.p1Name}의 목숨이 1 감소했습니다.`, '');
+            
+            if (classicState.p1Hp <= 0) {
+                sendP2PMessage({ 
+                    type: 'GAME_OVER', 
+                    p1Hp: classicState.p1Hp, 
+                    p2Hp: classicState.p2Hp, 
+                    reason: '목숨 모두 소진' 
+                });
+                endClassicGame('player2', '목숨 모두 소진');
+            } else {
+                sendP2PMessage({ 
+                    type: 'ROUND_FAIL', 
+                    p1Hp: classicState.p1Hp, 
+                    p2Hp: classicState.p2Hp 
+                });
+                classicState.prefixChar = '';
+                classicState.currentTurn = 'player2';
+                startClassicTurnCycle();
+            }
         }
     } else {
         // 싱글/로컬의 경우 현재 턴 주체가 타임아웃
-        const winner = (classicState.currentTurn === 'player1') ? 'player2' : 'player1';
-        endClassicGame(winner, '시간 초과');
+        if (loser === 'player1') {
+            classicState.p1Hp -= 1;
+            addClassicChatBubble('system', `⏱️ 시간 초과! ${classicState.p1Name}의 목숨이 1 감소했습니다.`, '');
+        } else {
+            classicState.p2Hp -= 1;
+            addClassicChatBubble('system', `⏱️ 시간 초과! ${classicState.p2Name}의 목숨이 1 감소했습니다.`, '');
+        }
+        updateClassicHpUI();
+        
+        if (classicState.p1Hp <= 0) {
+            endClassicGame('player2', '목숨 모두 소진');
+        } else if (classicState.p2Hp <= 0) {
+            endClassicGame('player1', '목숨 모두 소진');
+        } else {
+            classicState.prefixChar = '';
+            classicState.currentTurn = winner;
+            startClassicTurnCycle();
+        }
     }
 }
 
@@ -77433,6 +77707,42 @@ function endClassicGame(winner, reason) {
         chip.title = h.definition;
         chipsContainer.appendChild(chip);
     });
+}
+
+// 플레이어 목숨(HP) UI 업데이트
+function updateClassicHpUI() {
+    const p1Container = document.getElementById('classic-p1-hp-hearts');
+    const p2Container = document.getElementById('classic-p2-hp-hearts');
+    
+    if (p1Container) {
+        p1Container.innerHTML = '';
+        for (let i = 0; i < 3; i++) {
+            const heart = document.createElement('span');
+            heart.className = i < classicState.p1Hp ? 'heart-icon filled' : 'heart-icon empty';
+            heart.textContent = i < classicState.p1Hp ? '❤️' : '🖤';
+            p1Container.appendChild(heart);
+        }
+    }
+    if (p2Container) {
+        p2Container.innerHTML = '';
+        for (let i = 0; i < 3; i++) {
+            const heart = document.createElement('span');
+            heart.className = i < classicState.p2Hp ? 'heart-icon filled' : 'heart-icon empty';
+            heart.textContent = i < classicState.p2Hp ? '❤️' : '🖤';
+            p2Container.appendChild(heart);
+        }
+    }
+    
+    // 프로그레스 바 및 텍스트 업데이트
+    const p1Bar = document.getElementById('classic-p1-hp-bar');
+    const p1Text = document.getElementById('classic-p1-hp-text');
+    if (p1Bar) p1Bar.style.width = `${(classicState.p1Hp / 3) * 100}%`;
+    if (p1Text) p1Text.textContent = `목숨: ${classicState.p1Hp} / 3`;
+    
+    const p2Bar = document.getElementById('classic-p2-hp-bar');
+    const p2Text = document.getElementById('classic-p2-hp-text');
+    if (p2Bar) p2Bar.style.width = `${(classicState.p2Hp / 3) * 100}%`;
+    if (p2Text) p2Text.textContent = `목숨: ${classicState.p2Hp} / 3`;
 }
 
 // 대결 아레나 UI 새로고침

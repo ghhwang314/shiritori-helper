@@ -194,6 +194,20 @@
                             </div>
                         </div>
 
+                        <!-- Active Skills & Inventory Panel -->
+                        <div class="battle-inventory-panel" id="battle-inventory-panel">
+                            <div class="inventory-stats">
+                                <div class="stat-item">💰 골드: <strong id="battle-player-gold">50</strong>G</div>
+                                <div class="stat-item" id="battle-stock-stat">📈 주가: <strong id="battle-stock-price">100</strong>G / 1주</div>
+                                <div class="stat-item" id="battle-shares-stat">🛡️ 보유 주식: <strong id="battle-player-shares">0</strong>주</div>
+                            </div>
+                            <div class="inventory-actions" id="battle-inventory-actions">
+                                <button id="btn-buy-stock" class="skill-action-btn hidden">📈 주식 매수 (1주)</button>
+                                <button id="btn-sell-stock" class="skill-action-btn hidden">📉 주식 매도 (1주)</button>
+                                <button id="btn-eat-burger" class="skill-action-btn hidden">🍔 게살버거 먹기 (-30G)</button>
+                            </div>
+                        </div>
+
                         <!-- Input actions -->
                         <div class="battle-input-area">
                             <div class="input-prefix-label" id="battle-input-prefix">시작글자:</div>
@@ -224,14 +238,14 @@
                         <div class="game-mode-selector">
                             <span class="setup-label">대결 모드 선택</span>
                             <div class="mode-buttons-grid">
-                                <button class="mode-btn active" id="mode-single" data-mode="single">👤 싱글 플레이 (vs AI)</button>
+                                <button class="mode-btn" id="mode-single" data-mode="single">👤 싱글 플레이 (vs AI)</button>
                                 <button class="mode-btn" id="mode-local" data-mode="local">👥 로컬 2인용 (한 화면)</button>
-                                <button class="mode-btn" id="mode-online" data-mode="online">🌐 온라인 2인용 (실시간 P2P)</button>
+                                <button class="mode-btn active" id="mode-online" data-mode="online">🌐 온라인 2인용 (실시간 P2P)</button>
                             </div>
                         </div>
 
                         <!-- Online P2P Controls (Initially Hidden) -->
-                        <div class="online-setup-card hidden" id="classic-online-setup">
+                        <div class="online-setup-card" id="classic-online-setup">
                             <div class="online-grid">
                                 <div class="online-action-box">
                                     <h4>🏠 방 만들기 (Host)</h4>
@@ -261,7 +275,7 @@
 
                         <!-- Game Options -->
                         <div class="options-grid">
-                            <div class="option-card" id="classic-ai-difficulty-box">
+                            <div class="option-card hidden" id="classic-ai-difficulty-box">
                                 <span class="option-title">AI 난이도</span>
                                 <select id="classic-ai-difficulty" class="custom-select">
                                     <option value="easy">쉬움 (AI의 잦은 실수)</option>
@@ -305,7 +319,7 @@
                                 </select>
                             </div>
 
-                            <div class="option-card" id="classic-start-turn-box">
+                            <div class="option-card hidden" id="classic-start-turn-box">
                                 <span class="option-title">선공 설정</span>
                                 <select id="classic-start-turn" class="custom-select">
                                     <option value="player1" selected>내가 선공 (Player 1)</option>
@@ -331,6 +345,7 @@
                                     <div class="hp-bar-fill" id="classic-p1-hp-bar" style="width: 100%;"></div>
                                     <span class="hp-text" id="classic-p1-hp-text">목숨: 3 / 3</span>
                                 </div>
+                                <div class="classic-hp-hearts" id="classic-p1-hp-hearts"></div>
                             </div>
 
                             <div class="turn-indicator">
@@ -347,6 +362,7 @@
                                     <div class="hp-bar-fill" id="classic-p2-hp-bar" style="width: 100%;"></div>
                                     <span class="hp-text" id="classic-p2-hp-text">목숨: 3 / 3</span>
                                 </div>
+                                <div class="classic-hp-hearts" id="classic-p2-hp-hearts"></div>
                             </div>
                         </div>
 
