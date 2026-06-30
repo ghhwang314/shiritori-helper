@@ -75372,9 +75372,9 @@ function renderWordList(resetLimit = true) {
             const isQueryConsonantOnly = [...searchQuery].every(c => CHOSUNG_LIST.includes(c));
             
             if (isQueryConsonantOnly) {
-                // 자음 매칭 (단어의 첫 자음이 검색어 자음 문자열로 시작하는지)
+                // 자음 매칭 (단어의 자음이 검색어 자음 문자열로 시작하는지 검사)
                 const wordChosungs = [...item.word].map(c => getChosung(c)).join('');
-                if (!wordChosungs.includes(searchQuery)) {
+                if (!wordChosungs.startsWith(searchQuery)) {
                     return false;
                 }
             } else {
@@ -75382,8 +75382,8 @@ function renderWordList(resetLimit = true) {
                 const cleanQuery = searchQuery.trim().toLowerCase();
                 const wordLower = item.word.toLowerCase();
                 
-                // 단어 전체 포함 여부 또는 첫글자 매칭
-                if (!wordLower.includes(cleanQuery)) {
+                // 검색어 글자로 시작하는 단어만 필터링
+                if (!wordLower.startsWith(cleanQuery)) {
                     return false;
                 }
             }
@@ -75896,6 +75896,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderWordList();
     renderRulesGuide();
     initRpgSimulator(); // RPG 시뮬레이터 바인딩 추가
+    initClassicGame(); // 클래식 끝말잇기 바인딩 추가
 });
 
 /* ========================================================
@@ -75977,11 +75978,13 @@ function initRpgSimulator() {
     const codexPanel = document.getElementById('job-codex-panel');
     const sidebar = document.querySelector('.sidebar-section');
 
+    const classicPanel = document.getElementById('classic-game-panel');
+
     // 탭 전환 이벤트 바인딩
     tabRpg.addEventListener('click', () => {
         setActiveTabBtn(tabRpg);
         showPanels([rpgPanel]);
-        hidePanels([wordListSection, searchSection, loadMoreWrapper, sortingWrapper, codexPanel]);
+        hidePanels([wordListSection, searchSection, loadMoreWrapper, sortingWrapper, codexPanel, classicPanel]);
         currentTab = 'rpg';
         if (!isBattleRunning) {
             resetBattleSetup();
@@ -75991,18 +75994,18 @@ function initRpgSimulator() {
     tabCodex.addEventListener('click', () => {
         setActiveTabBtn(tabCodex);
         showPanels([codexPanel]);
-        hidePanels([wordListSection, searchSection, loadMoreWrapper, sortingWrapper, rpgPanel]);
+        hidePanels([wordListSection, searchSection, loadMoreWrapper, sortingWrapper, rpgPanel, classicPanel]);
         currentTab = 'codex';
         renderJobCodex();
     });
 
-    // 기존 단어 리스트 탭 클릭 시 RPG 시뮬레이터 패널 숨기기
+    // 기존 단어 리스트 탭 클릭 시 타 패널 숨기기
     [allWordsTabBtn, lureWordsTabBtn, favWordsTabBtn].forEach(tab => {
         tab.addEventListener('click', () => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             tab.classList.add('active');
             showPanels([wordListSection, searchSection, loadMoreWrapper, sortingWrapper]);
-            hidePanels([rpgPanel, codexPanel]);
+            hidePanels([rpgPanel, codexPanel, classicPanel]);
         });
     });
 
@@ -76478,4 +76481,1022 @@ function addLogRow(type, text) {
     logScreen.appendChild(row);
     logScreen.scrollTop = logScreen.scrollHeight;
 }
+
+/* ========================================================
+   🎮 끝말잇기 클래식 & 실시간 P2P 멀티플레이어 엔진
+   ======================================================== */
+
+// 클래식 게임 상태 관리 객체
+let classicState = {
+    mode: 'single', // 'single' (AI), 'local' (2인용), 'online' (P2P)
+    isGameRunning: false,
+    difficulty: 'normal',
+    ruleDueum: true,
+    ruleTimerLimit: 20, // 0 = 무제한
+    ruleBanOneShot: true,
+    ruleLengthLimit: 2,
+    startTurn: 'player1', // 'player1', 'player2', 'random'
+    
+    currentTurn: 'player1', // 'player1' or 'player2'
+    turnCount: 1,
+    prefixChar: '',
+    usedWords: new Set(),
+    p1Hp: 3,
+    p2Hp: 3,
+    
+    p1Name: 'Player 1',
+    p2Name: 'Player 2',
+    
+    timerInterval: null,
+    timerTimeLeft: 20,
+    hintsLeft: 3,
+    hintCooldown: false,
+    
+    // 스탯 집계용
+    p1WordsCount: 0,
+    p1TotalLength: 0,
+    p1OneShotCount: 0,
+    rallyHistory: [] // { sender, word, definition }
+};
+
+// PeerJS P2P 통신용 변수
+let classicPeer = null;
+let classicConn = null;
+let classicMyId = '';
+let classicIsHost = false;
+let classicIsConnected = false;
+
+// 자음별 캐싱 딕셔너리
+const classicLoadedDicts = {};
+const classicLoadingDicts = {};
+
+// 초성 추출 헬퍼
+function getClassicChoSung(char) {
+    if (!char) return null;
+    const charCode = char.charCodeAt(0);
+    if (charCode >= 0xAC00 && charCode <= 0xD7A3) {
+        const choIndex = Math.floor((charCode - 0xAC00) / 28 / 21);
+        const CHO_LIST = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+        return CHO_LIST[choIndex];
+    }
+    return null;
+}
+
+// 자음 사전 텍스트 비동기 다운로드 및 캐싱
+async function loadClassicDictionary(char) {
+    const cho = getClassicChoSung(char);
+    if (!cho) return false;
+    if (classicLoadedDicts[cho]) return true;
+    if (classicLoadingDicts[cho]) return classicLoadingDicts[cho];
+    
+    classicLoadingDicts[cho] = (async () => {
+        try {
+            const response = await fetch(`dict/${cho}.txt`);
+            if (!response.ok) throw new Error('File not found');
+            const text = await response.text();
+            // 개행 기준 배열 분할 및 정리
+            const arr = text.split(/\r?\n/).map(w => w.trim()).filter(w => w.length >= 2);
+            classicLoadedDicts[cho] = new Set(arr);
+            delete classicLoadingDicts[cho];
+            console.log(`[사전 로더] ${cho} 사전 로드 완료 (${classicLoadedDicts[cho].size} 단어)`);
+            return true;
+        } catch (err) {
+            console.warn(`[사전 로더] ${cho} 사전 조회 실패 (폴백 사용):`, err);
+            delete classicLoadingDicts[cho];
+            return false;
+        }
+    })();
+    return classicLoadingDicts[cho];
+}
+
+// 단어 유효성 검증 함수
+async function validateClassicWord(word, prefixChar, ruleDueum, banOneShot, lengthLimit, usedWordsSet) {
+    // 1. 글자 수 제약
+    if (word.length < lengthLimit) {
+        return { valid: false, reason: `최소 ${lengthLimit}글자 이상이어야 합니다.` };
+    }
+    // 2. 한글 여부
+    if (!/^[가-힣]+$/.test(word)) {
+        return { valid: false, reason: '공백이나 특수문자 없는 한글 단어만 입력하세요.' };
+    }
+    // 3. 중복 사용 여부
+    if (usedWordsSet.has(word)) {
+        return { valid: false, reason: `[${word}]은(는) 이미 사용된 단어입니다.` };
+    }
+    // 4. 시작글자 검증
+    if (prefixChar) {
+        const first = word.charAt(0);
+        const allowed = [prefixChar];
+        if (ruleDueum) {
+            allowed.push(applyDuEum(prefixChar));
+        }
+        if (!allowed.includes(first)) {
+            return { valid: false, reason: `[${prefixChar}]${ruleDueum ? ` (또는 두음법칙 [${applyDuEum(prefixChar)}])` : ''}(으)로 시작하는 단어여야 합니다.` };
+        }
+    }
+    // 5. 한방단어 금지 여부
+    const last = word.slice(-1);
+    const hasRule = ATTACK_RULES[last];
+    if (banOneShot && hasRule && hasRule.tier >= 4) {
+        return { valid: false, reason: `한방단어 금지 규칙에 의해 끝글자가 [${last}]인 공격단어는 사용할 수 없습니다.` };
+    }
+    
+    // 6. DB 존재 대조
+    const inDatabase = WORD_DATABASE.find(w => w.word === word);
+    if (inDatabase) {
+        return { valid: true, definition: inDatabase.definition, isWinning: inDatabase.tier >= 4 };
+    }
+    
+    // 7. 실시간 파일 사전 대조
+    const firstChar = word.charAt(0);
+    const isLoaded = await loadClassicDictionary(firstChar);
+    if (isLoaded) {
+        const cho = getClassicChoSung(firstChar);
+        const dict = classicLoadedDicts[cho];
+        if (dict && dict.has(word)) {
+            const isWinning = ATTACK_RULES[last] && ATTACK_RULES[last].tier >= 4;
+            return { valid: true, definition: '표준국어대사전 등록 단어', isWinning };
+        } else {
+            return { valid: false, reason: '사전에 존재하지 않는 단어입니다.' };
+        }
+    } else {
+        // 로컬 실행(file://) CORS 실패 시 임시 허용 (사용성 배려)
+        if (window.location.protocol === 'file:') {
+            const isWinning = ATTACK_RULES[last] && ATTACK_RULES[last].tier >= 4;
+            return { 
+                valid: true, 
+                definition: '로컬 실행 임시 허용 단어 (웹 서버 구동 시 전체 검증 활성)', 
+                isWinning,
+                isFallback: true
+            };
+        } else {
+            return { valid: false, reason: '사전 로딩 실패로 단어를 확인할 수 없습니다.' };
+        }
+    }
+}
+
+// AI 단어 탐색 알고리즘
+async function searchAIWord(prefixChar, ruleDueum, banOneShot, lengthLimit, usedWordsSet, difficulty) {
+    const allowed = [prefixChar];
+    if (ruleDueum) {
+        allowed.push(applyDuEum(prefixChar));
+    }
+    
+    let candidates = [];
+    
+    // 1. WORD_DATABASE에서 찾기
+    WORD_DATABASE.forEach(item => {
+        const first = item.word.charAt(0);
+        if (allowed.includes(first) && !usedWordsSet.has(item.word)) {
+            const last = item.word.slice(-1);
+            if (banOneShot && ATTACK_RULES[last] && ATTACK_RULES[last].tier >= 4) return;
+            if (item.word.length < lengthLimit) return;
+            candidates.push({ word: item.word, definition: item.definition, isWinning: item.tier >= 4 });
+        }
+    });
+    
+    // 2. 동적 사전에서 찾기
+    for (const start of allowed) {
+        const isLoaded = await loadClassicDictionary(start);
+        if (isLoaded) {
+            const cho = getClassicChoSung(start);
+            const dict = classicLoadedDicts[cho];
+            if (dict) {
+                dict.forEach(w => {
+                    if (w.charAt(0) === start && !usedWordsSet.has(w)) {
+                        const last = w.slice(-1);
+                        if (banOneShot && ATTACK_RULES[last] && ATTACK_RULES[last].tier >= 4) return;
+                        if (w.length < lengthLimit) return;
+                        const isWinning = ATTACK_RULES[last] && ATTACK_RULES[last].tier >= 4;
+                        candidates.push({ word: w, definition: '표준국어대사전 등록 단어', isWinning });
+                    }
+                });
+            }
+        }
+    }
+    
+    if (candidates.length === 0) return null;
+    
+    // 3. 난이도별 차등 선택
+    if (difficulty === 'easy') {
+        // 쉬움: 25% 확률로 기권, 혹은 단순 단어 무작위 선택 (한방단어 피해가기)
+        if (Math.random() < 0.25) return null;
+        const simplePool = candidates.filter(c => !c.isWinning);
+        const pool = simplePool.length > 0 ? simplePool : candidates;
+        return pool[Math.floor(Math.random() * pool.length)];
+    } else if (difficulty === 'normal') {
+        // 보통: 무작위 선택, 5% 확률 기권
+        if (Math.random() < 0.05) return null;
+        return candidates[Math.floor(Math.random() * candidates.length)];
+    } else {
+        // 어려움: 공격성 극대화 (한방 유도/끝글자 위주 정렬 후 최선 선택)
+        const attackPool = candidates.filter(c => c.isWinning || (ATTACK_RULES[c.word.slice(-1)] && ATTACK_RULES[c.word.slice(-1)].tier >= 3));
+        const pool = attackPool.length > 0 ? attackPool : candidates;
+        return pool[Math.floor(Math.random() * pool.length)];
+    }
+}
+
+// 클래식 탭 초기화 및 이벤트 연결
+function initClassicGame() {
+    const tabClassic = document.getElementById('tab-classic-game');
+    const classicPanel = document.getElementById('classic-game-panel');
+    
+    // 탭 클릭 바인딩
+    tabClassic.addEventListener('click', () => {
+        setActiveTabBtn(tabClassic);
+        showPanels([classicPanel]);
+        // 타 패널 숨기기
+        const wordListSection = document.getElementById('word-cards-list');
+        const searchSection = document.querySelector('.search-section');
+        const loadMoreWrapper = document.getElementById('load-more-wrapper');
+        const sortingWrapper = document.getElementById('sorting-controls-wrapper');
+        const rpgPanel = document.getElementById('rpg-simulator-panel');
+        const codexPanel = document.getElementById('job-codex-panel');
+        
+        hidePanels([wordListSection, searchSection, loadMoreWrapper, sortingWrapper, rpgPanel, codexPanel]);
+        currentTab = 'classic';
+        if (!classicState.isGameRunning) {
+            resetClassicSetupUI();
+        }
+    });
+
+    // 모드 셀렉터 바인딩
+    const modeButtons = document.querySelectorAll('.game-mode-selector .mode-btn');
+    modeButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            modeButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            const mode = btn.dataset.mode;
+            classicState.mode = mode;
+            
+            // 온라인 셋업 레이아웃 토글
+            const onlineSetup = document.getElementById('classic-online-setup');
+            const aiDifficulty = document.getElementById('classic-ai-difficulty-box');
+            const startTurn = document.getElementById('classic-start-turn-box');
+            
+            if (mode === 'online') {
+                onlineSetup.classList.remove('hidden');
+                aiDifficulty.classList.add('hidden');
+                startTurn.classList.add('hidden');
+                
+                // 시작 버튼은 연결 완료 전까지 비활성화
+                document.getElementById('start-classic-game-btn').disabled = true;
+                document.getElementById('start-classic-game-btn').textContent = '상대방 연결이 필요합니다';
+            } else {
+                onlineSetup.classList.add('hidden');
+                aiDifficulty.classList.remove('hidden');
+                startTurn.classList.remove('hidden');
+                document.getElementById('start-classic-game-btn').disabled = false;
+                document.getElementById('start-classic-game-btn').textContent = '⚡ 게임 시작하기';
+                
+                // Peer 연결이 켜져있다면 중단
+                cleanupPeerConnection();
+            }
+        });
+    });
+
+    // 방 만들기 버튼
+    document.getElementById('classic-create-room-btn').addEventListener('click', createClassicRoom);
+    // 방 참여하기 버튼
+    document.getElementById('classic-join-room-btn').addEventListener('click', joinClassicRoom);
+    // 방 코드 복사 버튼
+    document.getElementById('classic-copy-code-btn').addEventListener('click', copyRoomCode);
+    
+    // 제출 이벤트
+    document.getElementById('classic-submit-btn').addEventListener('click', handleClassicSubmit);
+    document.getElementById('classic-word-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleClassicSubmit();
+    });
+    
+    // 시작 및 기권/다시하기 버튼
+    document.getElementById('start-classic-game-btn').addEventListener('click', startClassicGame);
+    document.getElementById('classic-giveup-btn').addEventListener('click', () => {
+        if (confirm('정말로 기권하시겠습니까?')) {
+            if (classicState.mode === 'online' && classicConn) {
+                sendP2PMessage({ type: 'GIVEUP' });
+            }
+            endClassicGame('opponent', '기권');
+        }
+    });
+    document.getElementById('classic-restart-btn').addEventListener('click', () => {
+        document.getElementById('classic-gameover-view').classList.add('hidden');
+        document.getElementById('classic-setup-view').classList.remove('hidden');
+        resetClassicSetupUI();
+    });
+    
+    // 힌트 버튼
+    document.getElementById('classic-hint-btn').addEventListener('click', triggerClassicHint);
+
+    // 옵션 변경 감지 -> 온라인 시 상대에게 실시간 싱크
+    document.getElementById('classic-rule-dueum').addEventListener('change', broadcastClassicRules);
+    document.getElementById('classic-rule-timer').addEventListener('change', broadcastClassicRules);
+    document.getElementById('classic-rule-ban-one-shot').addEventListener('change', broadcastClassicRules);
+    document.getElementById('classic-rule-length').addEventListener('change', broadcastClassicRules);
+}
+
+// 온라인 P2P 룰 전송 도구
+function broadcastClassicRules() {
+    if (classicState.mode === 'online' && classicIsHost && classicIsConnected) {
+        sendP2PMessage({
+            type: 'SYNC_RULE',
+            rules: {
+                dueum: document.getElementById('classic-rule-dueum').checked,
+                timer: parseInt(document.getElementById('classic-rule-timer').value),
+                banOneShot: document.getElementById('classic-rule-ban-one-shot').checked,
+                lengthLimit: parseInt(document.getElementById('classic-rule-length').value)
+            }
+        });
+    }
+}
+
+// 온라인 참여자 옵션 조작 비활성화 제어
+function toggleClassicOptionsDisable(disabled) {
+    document.getElementById('classic-rule-dueum').disabled = disabled;
+    document.getElementById('classic-rule-timer').disabled = disabled;
+    document.getElementById('classic-rule-ban-one-shot').disabled = disabled;
+    document.getElementById('classic-rule-length').disabled = disabled;
+    
+    // 비활성화 시 스타일 가시성 개선 (마우스 효과 제어)
+    const cards = document.querySelectorAll('.options-grid .option-card');
+    cards.forEach(c => {
+        if (disabled) {
+            c.style.opacity = '0.6';
+            c.style.pointerEvents = 'none';
+        } else {
+            c.style.opacity = '1';
+            c.style.pointerEvents = 'auto';
+        }
+    });
+}
+
+// 방 만들기 (Host)
+function createClassicRoom() {
+    const btn = document.getElementById('classic-create-room-btn');
+    btn.disabled = true;
+    btn.textContent = '방 코드 발급 중...';
+    
+    cleanupPeerConnection();
+    
+    // 6자리 임의 코드 생성
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    
+    // Peer 객체 초기화 (SHIRITORI- 네임스페이스 활용)
+    classicPeer = new Peer(`SHIRITORI-${code}`, {
+        debug: 1
+    });
+    
+    classicPeer.on('open', (id) => {
+        classicIsHost = true;
+        document.getElementById('classic-room-code-text').textContent = code;
+        document.getElementById('classic-room-code-box').classList.remove('hidden');
+        updateConnectionStatus('connecting', '방 개설 완료. 상대 접속 대기 중...');
+    });
+    
+    classicPeer.on('connection', (conn) => {
+        if (classicConn) {
+            conn.close();
+            return;
+        }
+        classicConn = conn;
+        setupP2PConnection();
+    });
+    
+    classicPeer.on('error', (err) => {
+        console.error('PeerJS Host Error:', err);
+        showToast('방 개설에 실패했습니다. 다른 코드로 재시도 하거나 일반 모드를 즐겨보세요.', true);
+        resetOnlineSetupUI();
+    });
+}
+
+// 방 접속하기 (Guest)
+function joinClassicRoom() {
+    const input = document.getElementById('classic-join-code-input');
+    const joinCode = input.value.trim().toUpperCase();
+    
+    if (joinCode.length !== 6) {
+        showToast('올바른 6자리 코드를 입력해 주세요.', true);
+        return;
+    }
+    
+    const btn = document.getElementById('classic-join-room-btn');
+    btn.disabled = true;
+    btn.textContent = '접속 중...';
+    
+    cleanupPeerConnection();
+    
+    classicPeer = new Peer();
+    
+    classicPeer.on('open', () => {
+        classicIsHost = false;
+        classicConn = classicPeer.connect(`SHIRITORI-${joinCode}`);
+        setupP2PConnection();
+    });
+    
+    classicPeer.on('error', (err) => {
+        console.error('PeerJS Guest Error:', err);
+        showToast('연결에 실패했습니다. 코드를 확인해 주세요.', true);
+        resetOnlineSetupUI();
+    });
+}
+
+// P2P 연결 세팅
+function setupP2PConnection() {
+    updateConnectionStatus('connecting', '터널 형성 완료. 핸드셰이크 중...');
+    
+    classicConn.on('open', () => {
+        classicIsConnected = true;
+        updateConnectionStatus('connected', '상대방과 실시간 연결되었습니다!');
+        
+        const startBtn = document.getElementById('start-classic-game-btn');
+        if (classicIsHost) {
+            startBtn.disabled = false;
+            startBtn.textContent = '⚡ 대결 시작하기';
+            toggleClassicOptionsDisable(false);
+            
+            // 호스트가 규칙을 동기화하기 위해 객체 전송
+            sendP2PMessage({
+                type: 'SYNC_RULE',
+                rules: {
+                    dueum: document.getElementById('classic-rule-dueum').checked,
+                    timer: parseInt(document.getElementById('classic-rule-timer').value),
+                    banOneShot: document.getElementById('classic-rule-ban-one-shot').checked,
+                    lengthLimit: parseInt(document.getElementById('classic-rule-length').value)
+                }
+            });
+        } else {
+            startBtn.disabled = true;
+            startBtn.textContent = '방장의 시작을 기다리는 중...';
+            toggleClassicOptionsDisable(true);
+        }
+    });
+    
+    classicConn.on('data', (data) => {
+        handleP2PMessage(data);
+    });
+    
+    classicConn.on('close', () => {
+        handleP2PDisconnect();
+    });
+    
+    classicConn.on('error', (err) => {
+        console.error('Connection error:', err);
+        handleP2PDisconnect();
+    });
+}
+
+// P2P 메시지 전송
+function sendP2PMessage(data) {
+    if (classicConn && classicIsConnected) {
+        classicConn.send(data);
+    }
+}
+
+// P2P 수신 메시지 핸들러
+function handleP2PMessage(data) {
+    if (!data || !data.type) return;
+    
+    switch (data.type) {
+        case 'SYNC_RULE':
+            // 규칙 수신 및 적용 (Guest 화면 업데이트)
+            document.getElementById('classic-rule-dueum').checked = data.rules.dueum;
+            document.getElementById('classic-rule-timer').value = data.rules.timer;
+            document.getElementById('classic-rule-ban-one-shot').checked = data.rules.banOneShot;
+            document.getElementById('classic-rule-length').value = data.rules.lengthLimit;
+            break;
+            
+        case 'START_GAME':
+            // 호스트가 시작한 게임 강제 로딩
+            classicState.startTurn = data.startTurn;
+            executeClassicGameStart();
+            break;
+            
+        case 'WORD':
+            // 상대방이 입력한 단어 적용
+            applyClassicWordSubmission('player2', data.word, data.definition, data.isWinning);
+            break;
+            
+        case 'TIMEOUT':
+            // 상대방의 시간 초과로 내가 승리
+            endClassicGame('player1', '상대방 시간 초과');
+            break;
+            
+        case 'GIVEUP':
+            // 상대방 기권으로 내가 승리
+            endClassicGame('player1', '상대방 기권');
+            break;
+    }
+}
+
+// 연결 종료 처리
+function handleP2PDisconnect() {
+    if (classicIsConnected) {
+        classicIsConnected = false;
+        showToast('연결이 끊어졌습니다.', true);
+        if (classicState.isGameRunning) {
+            endClassicGame('player1', '상대 연결 두절');
+        } else {
+            resetOnlineSetupUI();
+        }
+    }
+}
+
+// 연결 상태 바 업데이트
+function updateConnectionStatus(status, text) {
+    const bar = document.getElementById('classic-connection-status');
+    const ping = bar.querySelector('.status-indicator-ping');
+    const label = document.getElementById('classic-connection-status-text');
+    
+    bar.classList.remove('hidden');
+    ping.className = 'status-indicator-ping';
+    
+    if (status === 'connecting') {
+        ping.classList.add('connecting');
+    } else if (status === 'disconnected') {
+        ping.classList.add('disconnected');
+    }
+    
+    label.textContent = text;
+}
+
+// 방 코드 복사
+function copyRoomCode() {
+    const text = document.getElementById('classic-room-code-text').textContent;
+    if (text === '------') return;
+    
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('방 코드가 클립보드에 복사되었습니다!');
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+    });
+}
+
+// PeerJS 정리
+function cleanupPeerConnection() {
+    classicIsConnected = false;
+    if (classicConn) {
+        classicConn.close();
+        classicConn = null;
+    }
+    if (classicPeer) {
+        classicPeer.destroy();
+        classicPeer = null;
+    }
+}
+
+// 온라인 셋업 UI 초기화
+function resetOnlineSetupUI() {
+    cleanupPeerConnection();
+    toggleClassicOptionsDisable(false);
+    
+    document.getElementById('classic-create-room-btn').disabled = false;
+    document.getElementById('classic-create-room-btn').textContent = '방 코드 생성하기';
+    document.getElementById('classic-room-code-box').classList.add('hidden');
+    document.getElementById('classic-room-code-text').textContent = '------';
+    
+    document.getElementById('classic-join-room-btn').disabled = false;
+    document.getElementById('classic-join-room-btn').textContent = '참여하기';
+    document.getElementById('classic-join-code-input').value = '';
+    
+    document.getElementById('classic-connection-status').classList.add('hidden');
+    
+    const startBtn = document.getElementById('start-classic-game-btn');
+    if (classicState.mode === 'online') {
+        startBtn.disabled = true;
+        startBtn.textContent = '상대방 연결이 필요합니다';
+    } else {
+        startBtn.disabled = false;
+        startBtn.textContent = '⚡ 게임 시작하기';
+    }
+}
+
+// 대기실 설정 상태 리셋
+function resetClassicSetupUI() {
+    resetOnlineSetupUI();
+    classicState.isGameRunning = false;
+    clearInterval(classicState.timerInterval);
+    
+    // 모드 초기 활성화
+    const activeModeBtn = document.querySelector('.game-mode-selector .mode-btn.active');
+    classicState.mode = activeModeBtn ? activeModeBtn.dataset.mode : 'single';
+}
+
+// 힌트 추천 기능
+async function triggerClassicHint() {
+    if (!classicState.isGameRunning || classicState.currentTurn !== 'player1') return;
+    if (classicState.mode === 'online') {
+        showToast('온라인 대결에서는 힌트를 사용할 수 없습니다.', true);
+        return;
+    }
+    if (classicState.hintsLeft <= 0) {
+        showToast('남은 힌트가 없습니다!', true);
+        return;
+    }
+    if (classicState.hintCooldown) return;
+    
+    classicState.hintCooldown = true;
+    const btn = document.getElementById('classic-hint-btn');
+    btn.textContent = '💡 힌트 분석 중...';
+    
+    // AI의 Hard 난이도 검색 모듈을 차용해 현재 단어 추천
+    const suggestion = await searchAIWord(
+        classicState.prefixChar, 
+        classicState.ruleDueum, 
+        classicState.ruleBanOneShot, 
+        classicState.ruleLengthLimit, 
+        classicState.usedWords, 
+        'hard'
+    );
+    
+    if (suggestion) {
+        classicState.hintsLeft -= 1;
+        btn.textContent = `💡 힌트 (남은 횟수: ${classicState.hintsLeft})`;
+        
+        // 팁 영역에 제안 표시
+        document.getElementById('classic-game-tip').innerHTML = `💡 추천 단어: <strong style="color: var(--accent-cyan); font-size: 1.1rem; border-bottom: 2px solid; padding-bottom: 2px;">${suggestion.word}</strong> (${suggestion.definition})`;
+        showToast('추천 단어가 하단 팁 영역에 표시되었습니다.');
+    } else {
+        btn.textContent = `💡 힌트 (남은 횟수: ${classicState.hintsLeft})`;
+        document.getElementById('classic-game-tip').textContent = '💡 현재 이을 수 있는 마땅한 단어가 없습니다! 상대의 막다른 덫에 걸린 것 같습니다.';
+        showToast('이을 수 있는 단어가 사전에 없습니다.', true);
+    }
+    
+    setTimeout(() => {
+        classicState.hintCooldown = false;
+    }, 1500);
+}
+
+// 클래식 게임 시작
+function startClassicGame() {
+    // 온라인 모드인 경우 호스트 측에서 시작 신호를 게스트에 송출
+    if (classicState.mode === 'online') {
+        if (!classicIsConnected) {
+            showToast('상대방이 아직 연결되지 않았습니다.', true);
+            return;
+        }
+        
+        if (classicIsHost) {
+            // 호스트가 무작위 선공/룰을 판정해 전송
+            let finalStart = document.getElementById('classic-start-turn').value;
+            if (finalStart === 'random') {
+                finalStart = Math.random() < 0.5 ? 'player1' : 'player2';
+            }
+            
+            sendP2PMessage({
+                type: 'START_GAME',
+                startTurn: finalStart === 'player1' ? 'player2' : 'player1' // 상대 시점에서는 턴이 반대이므로 반대로 전송
+            });
+            
+            classicState.startTurn = finalStart;
+            executeClassicGameStart();
+        }
+    } else {
+        // 로컬/싱글인 경우 바로 시작
+        let finalStart = document.getElementById('classic-start-turn').value;
+        if (finalStart === 'random') {
+            finalStart = Math.random() < 0.5 ? 'player1' : 'player2';
+        }
+        classicState.startTurn = finalStart;
+        executeClassicGameStart();
+    }
+}
+
+// 실제 아레나 뷰 전환 및 실행
+function executeClassicGameStart() {
+    classicState.isGameRunning = true;
+    classicState.usedWords.clear();
+    classicState.turnCount = 1;
+    classicState.prefixChar = '';
+    classicState.p1Hp = 3;
+    classicState.p2Hp = 3;
+    classicState.hintsLeft = 3;
+    
+    // 스탯 초기화
+    classicState.p1WordsCount = 0;
+    classicState.p1TotalLength = 0;
+    classicState.p1OneShotCount = 0;
+    classicState.rallyHistory = [];
+    
+    // 설정값 최종 추출
+    classicState.ruleDueum = document.getElementById('classic-rule-dueum').checked;
+    classicState.ruleTimerLimit = parseInt(document.getElementById('classic-rule-timer').value);
+    classicState.ruleBanOneShot = document.getElementById('classic-rule-ban-one-shot').checked;
+    classicState.ruleLengthLimit = parseInt(document.getElementById('classic-rule-length').value);
+    classicState.difficulty = document.getElementById('classic-ai-difficulty').value;
+    
+    // UI 세팅
+    document.getElementById('classic-setup-view').classList.add('hidden');
+    document.getElementById('classic-arena-view').classList.remove('hidden');
+    document.getElementById('classic-gameover-view').classList.add('hidden');
+    
+    // 플레이어 명칭 업데이트
+    if (classicState.mode === 'single') {
+        classicState.p1Name = '👤 나';
+        classicState.p2Name = '🤖 AI Bot';
+        document.getElementById('classic-p2-role').textContent = `AI (난이도: ${classicState.difficulty === 'easy' ? '쉬움' : classicState.difficulty === 'normal' ? '보통' : '어려움'})`;
+        document.getElementById('classic-hint-btn').classList.remove('hidden');
+        document.getElementById('classic-hint-btn').textContent = '💡 힌트 (남은 횟수: 3)';
+    } else if (classicState.mode === 'local') {
+        classicState.p1Name = '👤 플레이어 1';
+        classicState.p2Name = '👤 플레이어 2';
+        document.getElementById('classic-p2-role').textContent = '오프라인 상대';
+        document.getElementById('classic-hint-btn').classList.remove('hidden');
+        document.getElementById('classic-hint-btn').textContent = '💡 힌트 (남은 횟수: 3)';
+    } else {
+        // 온라인 P2P
+        classicState.p1Name = classicIsHost ? '🏠 나 (Host)' : '🚪 나 (Guest)';
+        classicState.p2Name = classicIsHost ? '🚪 상대방 (Guest)' : '🏠 상대방 (Host)';
+        document.getElementById('classic-p2-role').textContent = '실시간 온라인 상대';
+        document.getElementById('classic-hint-btn').classList.add('hidden'); // 온라인은 힌트 금지
+    }
+    
+    document.getElementById('classic-p1-name').textContent = classicState.p1Name;
+    document.getElementById('classic-p2-name').textContent = classicState.p2Name;
+    
+    // 챗 화면 비우기
+    const screen = document.getElementById('classic-chat-screen');
+    screen.innerHTML = '<div class="chat-bubble system-msg">⚔️ 대결이 개시되었습니다! 첫 턴 플레이어는 자유롭게 단어를 제출하세요.</div>';
+    
+    classicState.currentTurn = classicState.startTurn;
+    updateClassicArenaUI();
+    
+    // 턴 기동
+    startClassicTurnCycle();
+}
+
+// 턴 사이클 시작
+function startClassicTurnCycle() {
+    updateClassicArenaUI();
+    
+    if (classicState.currentTurn === 'player1') {
+        document.getElementById('classic-word-input').disabled = false;
+        document.getElementById('classic-submit-btn').disabled = false;
+        document.getElementById('classic-word-input').focus();
+        startClassicTimer();
+    } else {
+        // 상대 턴 (AI 또는 로컬 P2 / 온라인 P2)
+        if (classicState.mode === 'single') {
+            // AI 실행
+            document.getElementById('classic-word-input').disabled = true;
+            document.getElementById('classic-submit-btn').disabled = true;
+            startClassicTimer();
+            setTimeout(playClassicAITurn, 1500);
+        } else if (classicState.mode === 'local') {
+            // 로컬 2인용은 동일 입력창을 같이 쓰므로 입력 허용하되 가이드
+            document.getElementById('classic-word-input').disabled = false;
+            document.getElementById('classic-submit-btn').disabled = false;
+            document.getElementById('classic-word-input').focus();
+            startClassicTimer();
+        } else {
+            // 온라인 모드 - 입력 비활성화하고 대기
+            document.getElementById('classic-word-input').disabled = true;
+            document.getElementById('classic-submit-btn').disabled = true;
+            startClassicTimer();
+        }
+    }
+}
+
+// AI 단어 입력 실행
+async function playClassicAITurn() {
+    if (!classicState.isGameRunning || classicState.currentTurn !== 'player2') return;
+    
+    const wordObj = await searchAIWord(
+        classicState.prefixChar, 
+        classicState.ruleDueum, 
+        classicState.ruleBanOneShot, 
+        classicState.ruleLengthLimit, 
+        classicState.usedWords, 
+        classicState.difficulty
+    );
+    
+    if (wordObj) {
+        applyClassicWordSubmission('player2', wordObj.word, wordObj.definition, wordObj.isWinning);
+    } else {
+        // AI 기권 (사전에서 찾을 수 없음)
+        endClassicGame('player1', 'AI가 이을 단어를 찾지 못함');
+    }
+}
+
+// 단어 수동 제출 처리 (나)
+async function handleClassicSubmit() {
+    if (!classicState.isGameRunning) return;
+    
+    // 온라인 모드인데 내 턴이 아니면 차단
+    if (classicState.mode === 'online' && classicState.currentTurn !== 'player1') return;
+    
+    const input = document.getElementById('classic-word-input');
+    const word = input.value.trim();
+    if (!word) return;
+    
+    // 텍스트 검증 진행
+    const result = await validateClassicWord(
+        word, 
+        classicState.prefixChar, 
+        classicState.ruleDueum, 
+        classicState.ruleBanOneShot, 
+        classicState.ruleLengthLimit, 
+        classicState.usedWords
+    );
+    
+    if (!result.valid) {
+        showToast(result.reason, true);
+        // 챗창에 경고 표시하지 않고 토스트로만 피드백
+        return;
+    }
+    
+    input.value = '';
+    
+    const who = classicState.currentTurn; // player1 (나) 혹은 local모드에서는 player2일수도 있음
+    
+    // 온라인 모드 시 상대방에 송출
+    if (classicState.mode === 'online') {
+        sendP2PMessage({
+            type: 'WORD',
+            word: word,
+            definition: result.definition,
+            isWinning: result.isWinning
+        });
+    }
+    
+    applyClassicWordSubmission(who, word, result.definition, result.isWinning);
+}
+
+// 단어 등록 및 턴 전환 공통 처리
+function applyClassicWordSubmission(sender, word, definition, isWinning) {
+    clearInterval(classicState.timerInterval);
+    
+    // 1. 단어 사용 처리
+    classicState.usedWords.add(word);
+    classicState.prefixChar = word.slice(-1);
+    
+    // 2. 챗 화면에 버블 생성
+    addClassicChatBubble(sender, word, definition);
+    
+    // 3. 스탯 누적
+    if (sender === 'player1') {
+        classicState.p1WordsCount += 1;
+        classicState.p1TotalLength += word.length;
+        if (isWinning) {
+            classicState.p1OneShotCount += 1;
+        }
+    }
+    classicState.rallyHistory.push({ sender, word, definition });
+    
+    // 4. 턴 전환
+    classicState.currentTurn = (sender === 'player1') ? 'player2' : 'player1';
+    classicState.turnCount += 1;
+    
+    // 5. 팁 가이드 업데이트
+    document.getElementById('classic-game-tip').innerHTML = `💡 대기 중... 다음 단어는 <strong style="color: var(--accent-cyan); font-size: 1.1rem; border-bottom: 2px solid; padding-bottom: 2px;">${classicState.prefixChar}</strong> (또는 [${applyDuEum(classicState.prefixChar)}])(으)로 시작해야 합니다.`;
+    
+    // 6. 다음 턴 재개
+    startClassicTurnCycle();
+}
+
+// 시간 초과 처리
+function handleClassicTimeout() {
+    if (!classicState.isGameRunning) return;
+    
+    if (classicState.mode === 'online') {
+        // 온라인 턴에서 본인 턴일 때만 패배 선언 송출
+        if (classicState.currentTurn === 'player1') {
+            sendP2PMessage({ type: 'TIMEOUT' });
+            endClassicGame('player2', '시간 초과');
+        }
+    } else {
+        // 싱글/로컬의 경우 현재 턴 주체가 타임아웃
+        const winner = (classicState.currentTurn === 'player1') ? 'player2' : 'player1';
+        endClassicGame(winner, '시간 초과');
+    }
+}
+
+// 채팅 화면에 말풍선 렌더링
+function addClassicChatBubble(sender, word, definition) {
+    const screen = document.getElementById('classic-chat-screen');
+    const bubble = document.createElement('div');
+    bubble.className = `chat-bubble ${sender}`;
+    
+    // 시간 정보 추출
+    const now = new Date();
+    const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    
+    bubble.innerHTML = `
+        <span class="bubble-word">${word}</span>
+        <span class="bubble-def">${definition}</span>
+        <span class="bubble-meta">${sender === 'player1' ? classicState.p1Name : classicState.p2Name} • ${timeStr}</span>
+    `;
+    
+    screen.appendChild(bubble);
+    screen.scrollTop = screen.scrollHeight;
+}
+
+// 대결 종료 선언
+function endClassicGame(winner, reason) {
+    classicState.isGameRunning = false;
+    clearInterval(classicState.timerInterval);
+    
+    document.getElementById('classic-arena-view').classList.add('hidden');
+    document.getElementById('classic-gameover-view').classList.remove('hidden');
+    
+    // 타이틀 및 상세 결과 세팅
+    const title = document.getElementById('classic-result-title');
+    const desc = document.getElementById('classic-result-desc');
+    
+    if (winner === 'player1') {
+        title.textContent = '🏆 승리하셨습니다!';
+        title.className = 'text-center';
+        desc.textContent = `축하합니다! [${reason}](으)로 상대를 제압하고 대결에서 승리하셨습니다.`;
+        showToast('🏆 끝말잇기 게임 승리!');
+    } else {
+        title.textContent = '😢 패배하셨습니다...';
+        title.className = 'text-center lose';
+        desc.textContent = `아쉽습니다. [${reason}](으)로 인해 상대방에게 승리를 내주었습니다.`;
+        showToast('😢 끝말잇기 게임 패배...', true);
+    }
+    
+    // 상세 스탯 표기
+    document.getElementById('stat-total-turns').textContent = classicState.turnCount - 1;
+    document.getElementById('stat-my-words').textContent = classicState.p1WordsCount;
+    
+    const avgLen = classicState.p1WordsCount > 0 ? (classicState.p1TotalLength / classicState.p1WordsCount).toFixed(1) : '0.0';
+    document.getElementById('stat-avg-length').textContent = `${avgLen}글자`;
+    document.getElementById('stat-one-shot-count').textContent = `${classicState.p1OneShotCount}회`;
+    
+    // 단어 리스트 칩스 생성
+    const chipsContainer = document.getElementById('classic-played-chips');
+    chipsContainer.innerHTML = '';
+    
+    classicState.rallyHistory.forEach(h => {
+        const chip = document.createElement('span');
+        chip.className = 'word-chip';
+        chip.textContent = `${h.sender === 'player1' ? '나' : '상대'}: ${h.word}`;
+        chip.title = h.definition;
+        chipsContainer.appendChild(chip);
+    });
+}
+
+// 대결 아레나 UI 새로고침
+function updateClassicArenaUI() {
+    document.getElementById('classic-turn-count').textContent = `TURN ${classicState.turnCount}`;
+    
+    const p1Card = document.getElementById('classic-p1-card');
+    const p2Card = document.getElementById('classic-p2-card');
+    const arrow = document.getElementById('classic-turn-arrow');
+    
+    // 턴 표시 액션
+    if (classicState.currentTurn === 'player1') {
+        p1Card.classList.add('active');
+        p2Card.classList.remove('active');
+        arrow.textContent = '⬅️';
+        document.getElementById('classic-input-prefix').textContent = `시작글자: ${classicState.prefixChar ? `[${classicState.prefixChar}]` : '자유'}`;
+        document.getElementById('classic-word-input').placeholder = `${classicState.prefixChar ? `[${classicState.prefixChar}]` : '임의의 글자'}로 시작하는 단어 입력...`;
+    } else {
+        p2Card.classList.add('active');
+        p1Card.classList.remove('active');
+        arrow.textContent = '➡️';
+        
+        // 내 턴이 아닐 때는 시작 글자 안내 가리기
+        document.getElementById('classic-input-prefix').textContent = '상대 차례';
+        document.getElementById('classic-word-input').placeholder = '상대방이 단어를 입력 중입니다...';
+    }
+}
+
+// 타이머 기동 함수
+function startClassicTimer() {
+    clearInterval(classicState.timerInterval);
+    const limit = classicState.ruleTimerLimit;
+    if (limit === 0) {
+        document.getElementById('classic-timer-container').classList.add('hidden');
+        return;
+    }
+    
+    document.getElementById('classic-timer-container').classList.remove('hidden');
+    classicState.timerTimeLeft = limit;
+    updateClassicTimerUI();
+    
+    classicState.timerInterval = setInterval(() => {
+        classicState.timerTimeLeft -= 0.1;
+        if (classicState.timerTimeLeft <= 0) {
+            clearInterval(classicState.timerInterval);
+            handleClassicTimeout();
+        } else {
+            updateClassicTimerUI();
+        }
+    }, 100);
+}
+
+// 타이머 바 UI 렌더링
+function updateClassicTimerUI() {
+    const percent = (classicState.timerTimeLeft / classicState.ruleTimerLimit) * 100;
+    const bar = document.getElementById('classic-timer-bar');
+    bar.style.width = `${percent}%`;
+    if (percent < 30) {
+        bar.style.background = 'var(--tier-5)';
+        bar.style.boxShadow = '0 0 10px var(--tier-5-glow)';
+    } else {
+        bar.style.background = 'linear-gradient(90deg, var(--accent-cyan) 0%, var(--accent-pink) 100%)';
+        bar.style.boxShadow = '0 0 10px rgba(6, 182, 212, 0.6)';
+    }
+}
+
 

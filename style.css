@@ -1811,5 +1811,491 @@ body {
     }
 }
 
+/* ========================================================
+   🎮 끝말잇기 클래식 & P2P 멀티플레이어 스타일 정의
+   ======================================================== */
+
+.classic-game-container {
+    padding: 2rem;
+    border-radius: 16px;
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.game-setup-view h3 {
+    font-size: 1.6rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, #fff 0%, var(--text-secondary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.game-mode-selector {
+    margin: 2rem 0;
+    padding: 1.2rem;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.mode-buttons-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.mode-btn {
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: var(--text-secondary);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-normal);
+}
+
+.mode-btn:hover {
+    border-color: var(--accent-purple);
+    background: rgba(139, 92, 246, 0.1);
+    color: #fff;
+    transform: translateY(-2px);
+}
+
+.mode-btn.active {
+    background: linear-gradient(135deg, var(--accent-purple) 0%, rgba(139, 92, 246, 0.6) 100%);
+    border-color: var(--accent-purple);
+    color: #fff;
+    box-shadow: 0 4px 15px var(--accent-purple-glow);
+}
+
+.online-setup-card {
+    background: rgba(18, 22, 32, 0.85);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.online-grid {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.online-action-box {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.online-action-box h4 {
+    color: #fff;
+    font-size: 1.1rem;
+}
+
+.online-desc {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.online-divider {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.room-code-display {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 6px;
+    border: 1px dashed rgba(255, 255, 255, 0.15);
+    width: fit-content;
+}
+
+.room-code-display strong {
+    font-family: var(--font-eng);
+    font-size: 1.3rem;
+    color: var(--accent-cyan);
+    letter-spacing: 2px;
+}
+
+.copy-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 0.2rem;
+    transition: var(--transition-fast);
+}
+
+.copy-btn:hover {
+    transform: scale(1.2);
+}
+
+.online-setup-card .input-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.online-setup-card input[type="text"] {
+    flex: 1;
+    padding: 0.6rem 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: #fff;
+    font-family: var(--font-eng);
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-align: center;
+}
+
+.online-setup-card input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent-purple);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.connection-status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.status-indicator-ping {
+    width: 8px;
+    height: 8px;
+    background-color: #10b981;
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: 0 0 8px #10b981;
+    animation: pulse 1.5s infinite;
+}
+
+.status-indicator-ping.connecting {
+    background-color: #f59e0b;
+    box-shadow: 0 0 8px #f59e0b;
+}
+
+.status-indicator-ping.disconnected {
+    background-color: #ef4444;
+    box-shadow: 0 0 8px #ef4444;
+}
+
+@keyframes pulse {
+    0% { transform: scale(0.95); opacity: 0.5; }
+    50% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(0.95); opacity: 0.5; }
+}
+
+/* Options switches */
+.switch-wrapper {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.switch-wrapper input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.switch-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(255, 255, 255, 0.1);
+    transition: .3s;
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.switch-slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background-color: #fff;
+    transition: .3s;
+    border-radius: 50%;
+}
+
+.switch-wrapper input:checked + .switch-slider {
+    background-color: var(--accent-purple);
+}
+
+.switch-wrapper input:checked + .switch-slider:before {
+    transform: translateX(20px);
+}
+
+/* Game Arena timer */
+.classic-timer-container {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 1.5rem 0;
+    border: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.classic-timer-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-cyan) 0%, var(--accent-pink) 100%);
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.6);
+    transition: width 0.1s linear;
+}
+
+/* Chat bubble rally history */
+.classic-chat-screen {
+    height: 350px;
+    overflow-y: auto;
+    padding: 1rem;
+    background: rgba(10, 13, 20, 0.6);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    scroll-behavior: smooth;
+}
+
+.chat-bubble {
+    max-width: 75%;
+    padding: 0.8rem 1.2rem;
+    border-radius: 16px;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    position: relative;
+    animation: chatBubbleEntrance 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28) both;
+}
+
+@keyframes chatBubbleEntrance {
+    0% { transform: translateY(15px) scale(0.9); opacity: 0; }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.chat-bubble.system-msg {
+    align-self: center;
+    max-width: 90%;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    padding: 0.4rem 1rem;
+    border-radius: 20px;
+    text-align: center;
+}
+
+.chat-bubble.player1 {
+    align-self: flex-end;
+    background: linear-gradient(135deg, var(--accent-purple) 0%, rgba(139, 92, 246, 0.7) 100%);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
+}
+
+.chat-bubble.player2 {
+    align-self: flex-start;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+    border-bottom-left-radius: 4px;
+}
+
+.chat-bubble .bubble-word {
+    font-size: 1.15rem;
+    font-weight: 800;
+    display: block;
+    margin-bottom: 0.2rem;
+    letter-spacing: 0.5px;
+}
+
+.chat-bubble .bubble-def {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+    display: block;
+}
+
+.chat-bubble.player2 .bubble-def {
+    color: var(--text-secondary);
+}
+
+.chat-bubble .bubble-meta {
+    font-size: 0.65rem;
+    color: rgba(255, 255, 255, 0.5);
+    margin-top: 0.3rem;
+    text-align: right;
+    display: block;
+}
+
+.classic-history-wrapper {
+    margin-bottom: 1.5rem;
+}
+
+.classic-history-wrapper h5 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Gameover Screen */
+.classic-gameover-view {
+    animation: fadeIn 0.4s ease-out;
+}
+
+.gameover-header h2 {
+    font-size: 2.2rem;
+    font-weight: 900;
+    margin-bottom: 0.5rem;
+    color: var(--accent-cyan);
+    text-shadow: 0 0 15px var(--accent-cyan-glow);
+}
+
+.gameover-header h2.lose {
+    color: var(--tier-5);
+    text-shadow: 0 0 15px var(--tier-5-glow);
+}
+
+.stats-table {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    border-radius: 12px;
+}
+
+.stats-table h3 {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    color: #fff;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 0.5rem;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+}
+
+.stat-item {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.stat-item strong {
+    font-size: 1.4rem;
+    font-family: var(--font-eng);
+    color: #fff;
+}
+
+.played-words-list {
+    padding: 1.5rem;
+    border-radius: 12px;
+}
+
+.played-words-list h4 {
+    margin-bottom: 1rem;
+    color: var(--text-secondary);
+}
+
+.chips-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    max-height: 150px;
+    overflow-y: auto;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+}
+
+.word-chip {
+    padding: 0.3rem 0.8rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    border-radius: 14px;
+    transition: var(--transition-fast);
+}
+
+.word-chip:hover {
+    background: var(--accent-purple-glow);
+    border-color: var(--accent-purple);
+    transform: scale(1.05);
+}
+
+/* General button states */
+.action-btn.secondary {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: var(--text-primary);
+}
+
+.action-btn.secondary:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Responsive adjustment for online multiplayer code panel */
+@media (max-width: 600px) {
+    .online-grid {
+        flex-direction: column;
+        gap: 1.2rem;
+    }
+    
+    .online-divider {
+        align-self: center;
+        background: rgba(255, 255, 255, 0.05);
+        padding: 0.2rem 0.8rem;
+        border-radius: 12px;
+    }
+}
+
 
 

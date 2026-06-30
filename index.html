@@ -10,6 +10,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <!-- PeerJS for P2P multiplayer -->
+    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.4.7/dist/peerjs.min.js"></script>
 </head>
 <body>
     <div class="app-background"></div>
@@ -88,6 +90,9 @@
                         <button class="tab-btn" id="tab-fav-words">
                             즐겨찾기 
                             <span class="count-badge" id="fav-words-count">0</span>
+                        </button>
+                        <button class="tab-btn" id="tab-classic-game">
+                            🎮 끝말잇기 게임
                         </button>
                         <button class="tab-btn" id="tab-rpg-sim">
                             🎮 배틀 시뮬
@@ -208,7 +213,211 @@
                         <!-- Job cards will be dynamically injected here -->
                     </div>
                 </div>
-                
+
+                <!-- Classic Word Chain Game Area (Initially Hidden) -->
+                <div class="classic-game-container glass-panel hidden" id="classic-game-panel">
+                    <!-- 1. Setup View -->
+                    <div class="game-setup-view" id="classic-setup-view">
+                        <h3>🎮 끝말잇기 게임 대기실</h3>
+                        <p class="setup-desc">인공지능 대결, 한 화면에서 즐기는 2인 대결, 혹은 온라인 실시간 P2P 멀티플레이어 대결을 설정하세요.</p>
+                        
+                        <div class="game-mode-selector">
+                            <span class="setup-label">대결 모드 선택</span>
+                            <div class="mode-buttons-grid">
+                                <button class="mode-btn active" id="mode-single" data-mode="single">👤 싱글 플레이 (vs AI)</button>
+                                <button class="mode-btn" id="mode-local" data-mode="local">👥 로컬 2인용 (한 화면)</button>
+                                <button class="mode-btn" id="mode-online" data-mode="online">🌐 온라인 2인용 (실시간 P2P)</button>
+                            </div>
+                        </div>
+
+                        <!-- Online P2P Controls (Initially Hidden) -->
+                        <div class="online-setup-card hidden" id="classic-online-setup">
+                            <div class="online-grid">
+                                <div class="online-action-box">
+                                    <h4>🏠 방 만들기 (Host)</h4>
+                                    <p class="online-desc">새 방을 개설하고 친구에게 접속 코드를 알려주세요.</p>
+                                    <button class="action-btn" id="classic-create-room-btn">방 코드 생성하기</button>
+                                    <div class="room-code-display hidden" id="classic-room-code-box">
+                                        <span>방 코드:</span>
+                                        <strong id="classic-room-code-text">------</strong>
+                                        <button class="copy-btn" id="classic-copy-code-btn" title="코드 복사">📋</button>
+                                    </div>
+                                </div>
+                                <div class="online-divider">또는</div>
+                                <div class="online-action-box">
+                                    <h4>🚪 방 참여하기 (Guest)</h4>
+                                    <p class="online-desc">친구의 방 코드를 입력하고 접속하세요.</p>
+                                    <div class="input-row">
+                                        <input type="text" id="classic-join-code-input" placeholder="6자리 방 코드 입력..." maxlength="6" autocomplete="off">
+                                        <button class="action-btn" id="classic-join-room-btn">참여하기</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="connection-status-bar text-center hidden" id="classic-connection-status">
+                                <span class="status-indicator-ping"></span>
+                                <span id="classic-connection-status-text">접속 대기 중...</span>
+                            </div>
+                        </div>
+
+                        <!-- Game Options -->
+                        <div class="options-grid">
+                            <div class="option-card" id="classic-ai-difficulty-box">
+                                <span class="option-title">AI 난이도</span>
+                                <select id="classic-ai-difficulty" class="custom-select">
+                                    <option value="easy">쉬움 (AI의 잦은 실수)</option>
+                                    <option value="normal" selected>보통 (일반 어휘 방어)</option>
+                                    <option value="hard">어려움 (유도/한방단어 공격)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="option-card">
+                                <span class="option-title">두음법칙</span>
+                                <label class="switch-wrapper">
+                                    <input type="checkbox" id="classic-rule-dueum" checked>
+                                    <span class="switch-slider"></span>
+                                </label>
+                            </div>
+
+                            <div class="option-card">
+                                <span class="option-title">턴 시간 제한</span>
+                                <select id="classic-rule-timer" class="custom-select">
+                                    <option value="0">제한 없음 (무제한)</option>
+                                    <option value="10">10초 (짜릿하게)</option>
+                                    <option value="20" selected>20초 (기본값)</option>
+                                    <option value="30">30초 (느긋하게)</option>
+                                </select>
+                            </div>
+
+                            <div class="option-card">
+                                <span class="option-title">한방단어 금지</span>
+                                <label class="switch-wrapper">
+                                    <input type="checkbox" id="classic-rule-ban-one-shot" checked>
+                                    <span class="switch-slider"></span>
+                                </label>
+                                <span class="option-desc">늄, 륨 등 방어 불가 단어 사용 금지</span>
+                            </div>
+
+                            <div class="option-card">
+                                <span class="option-title">글자 수 제한</span>
+                                <select id="classic-rule-length" class="custom-select">
+                                    <option value="2" selected>2글자 이상</option>
+                                    <option value="3">3글자 이상</option>
+                                </select>
+                            </div>
+
+                            <div class="option-card" id="classic-start-turn-box">
+                                <span class="option-title">선공 설정</span>
+                                <select id="classic-start-turn" class="custom-select">
+                                    <option value="player1" selected>내가 선공 (Player 1)</option>
+                                    <option value="player2">AI/상대 선공 (Player 2)</option>
+                                    <option value="random">무작위 선공</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button class="action-btn start-battle-btn" id="start-classic-game-btn" style="margin-top: 2rem;">⚡ 게임 시작하기</button>
+                    </div>
+
+                    <!-- 2. Arena View -->
+                    <div class="classic-arena-view hidden" id="classic-arena-view">
+                        <!-- Arena header showing status, timer -->
+                        <div class="arena-header">
+                            <div class="arena-player-card" id="classic-p1-card">
+                                <div class="player-meta">
+                                    <span class="arena-job-name" id="classic-p1-name">👤 Player 1</span>
+                                    <span class="player-label">나</span>
+                                </div>
+                                <div class="hp-bar-wrapper">
+                                    <div class="hp-bar-fill" id="classic-p1-hp-bar" style="width: 100%;"></div>
+                                    <span class="hp-text" id="classic-p1-hp-text">목숨: 3 / 3</span>
+                                </div>
+                            </div>
+
+                            <div class="turn-indicator">
+                                <div class="turn-count" id="classic-turn-count">TURN 1</div>
+                                <div class="turn-active-arrow" id="classic-turn-arrow">➡️</div>
+                            </div>
+
+                            <div class="arena-player-card" id="classic-p2-card">
+                                <div class="player-meta">
+                                    <span class="player-label" id="classic-p2-role">AI 상대방</span>
+                                    <span class="arena-job-name" id="classic-p2-name">🤖 AI Bot</span>
+                                </div>
+                                <div class="hp-bar-wrapper">
+                                    <div class="hp-bar-fill" id="classic-p2-hp-bar" style="width: 100%;"></div>
+                                    <span class="hp-text" id="classic-p2-hp-text">목숨: 3 / 3</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Timer progress bar (active when turn limit is enabled) -->
+                        <div class="classic-timer-container hidden" id="classic-timer-container">
+                            <div class="classic-timer-bar" id="classic-timer-bar" style="width: 100%;"></div>
+                        </div>
+
+                        <!-- Word Chain Chat-bubble History -->
+                        <div class="classic-history-wrapper">
+                            <h5>💬 실시간 대결 랠리</h5>
+                            <div class="classic-chat-screen" id="classic-chat-screen">
+                                <div class="chat-bubble system-msg">⚔️ 끝말잇기 게임이 시작되었습니다!</div>
+                            </div>
+                        </div>
+
+                        <!-- Input actions -->
+                        <div class="battle-input-area">
+                            <div class="input-prefix-label" id="classic-input-prefix">시작글자: 자유</div>
+                            <input type="text" id="classic-word-input" placeholder="단어를 입력하고 Enter를 누르세요..." autocomplete="off">
+                            <button id="classic-submit-btn" class="action-btn">제출</button>
+                        </div>
+                        <div class="battle-actions-row">
+                            <button class="action-btn secondary" id="classic-hint-btn" title="사전에서 추천 단어 보기">💡 힌트 (남은 횟수: 3)</button>
+                            <button class="action-btn danger" id="classic-giveup-btn">🏳️ 기권하기</button>
+                            <div class="battle-tips" id="classic-game-tip">💡 사전 데이터를 동적으로 조회하여 상대와 끝말을 이어가세요.</div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Game Over View -->
+                    <div class="classic-gameover-view hidden" id="classic-gameover-view">
+                        <div class="gameover-header text-center">
+                            <h2 id="classic-result-title">🏆 승리하셨습니다!</h2>
+                            <p id="classic-result-desc" class="setup-desc">상대방이 단어를 제시간에 찾지 못해 승리하였습니다.</p>
+                        </div>
+
+                        <div class="stats-table glass-panel">
+                            <h3>📊 경기 통계 요약</h3>
+                            <div class="stats-grid">
+                                <div class="stat-item">
+                                    <span class="stat-label">진행된 턴 수</span>
+                                    <strong id="stat-total-turns">0</strong>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">내가 입력한 단어 수</span>
+                                    <strong id="stat-my-words">0</strong>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">평균 단어 글자수</span>
+                                    <strong id="stat-avg-length">0.0</strong>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">공격성 (한방 단어 사용)</span>
+                                    <strong id="stat-one-shot-count">0회</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="played-words-list glass-panel">
+                            <h4>📝 기록된 랠리 단어 목록</h4>
+                            <div class="chips-container" id="classic-played-chips">
+                                <!-- word chips go here -->
+                            </div>
+                        </div>
+
+                        <div class="text-center" style="margin-top: 2rem;">
+                            <button class="action-btn" id="classic-restart-btn">🔄 대기실로 돌아가기</button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Load More Button Wrapper -->
                 <div class="load-more-wrapper" id="load-more-wrapper"></div>
             </section>
