@@ -89,8 +89,14 @@
                             즐겨찾기 
                             <span class="count-badge" id="fav-words-count">0</span>
                         </button>
+                        <button class="tab-btn" id="tab-rpg-sim">
+                            🎮 배틀 시뮬
+                        </button>
+                        <button class="tab-btn" id="tab-job-codex">
+                            📖 직업 도감
+                        </button>
                     </div>
-                    <div class="sorting-controls">
+                    <div class="sorting-controls" id="sorting-controls-wrapper">
                         <select id="sort-select" class="custom-select">
                             <option value="korean">가나다순</option>
                             <option value="power-desc">공격력 높은순</option>
@@ -103,6 +109,104 @@
                 <div class="word-list-container scrollable-area" id="word-cards-list">
                     <div class="word-list-column" id="word-list-left"></div>
                     <div class="word-list-column" id="word-list-right"></div>
+                </div>
+                
+                <!-- RPG Battle Simulator Area (Initially Hidden) -->
+                <div class="rpg-simulator-container glass-panel hidden" id="rpg-simulator-panel">
+                    <div class="battle-setup" id="battle-setup-view">
+                        <h3>⚔️ 채린룰 끝말잇기 배틀 준비</h3>
+                        <p class="setup-desc">플레이어의 직업을 선택하고 가상의 AI 대결 상대를 챌린지하세요.</p>
+                        
+                        <div class="setup-grid">
+                            <div class="setup-card" id="player-setup">
+                                <h4>나 (Player 1)</h4>
+                                <div class="selected-job-display">
+                                    <div class="job-avatar" id="player-avatar">👤</div>
+                                    <div class="job-name" id="player-selected-job-name">직업을 선택해 주세요</div>
+                                </div>
+                                <button class="action-btn select-job-trigger" id="select-player-job-btn">직업 선택하기</button>
+                            </div>
+                            
+                            <div class="battle-versus">VS</div>
+                            
+                            <div class="setup-card" id="opponent-setup">
+                                <h4>상대방 AI (Player 2)</h4>
+                                <div class="selected-job-display">
+                                    <div class="job-avatar" id="opponent-avatar">🤖</div>
+                                    <div class="job-name" id="opponent-selected-job-name">랜덤 직업</div>
+                                </div>
+                                <select id="opponent-job-select" class="custom-select job-select-dropdown">
+                                    <option value="RANDOM">랜덤 선택</option>
+                                    <option value="WOLFMEN">늑대인간</option>
+                                    <option value="INVESTOR">주식투자자</option>
+                                    <option value="BURGER">게살버거</option>
+                                    <option value="COMETSTAR">혜성/별</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <button class="action-btn start-battle-btn" id="start-battle-btn">⚔️ 배틀 시작하기</button>
+                    </div>
+
+                    <div class="battle-arena hidden" id="battle-arena-view">
+                        <!-- Arena header showing status, HP, and cooldowns -->
+                        <div class="arena-header">
+                            <div class="arena-player-card" id="arena-player">
+                                <div class="player-meta">
+                                    <span class="arena-job-name" id="arena-player-job">늑대인간</span>
+                                    <span class="player-label">PLAYER</span>
+                                </div>
+                                <div class="hp-bar-wrapper">
+                                    <div class="hp-bar-fill" id="player-hp-bar" style="width: 100%;"></div>
+                                    <span class="hp-text" id="player-hp-text">목숨: 3 / 3</span>
+                                </div>
+                                <div class="debuff-tray" id="player-debuff-tray"></div>
+                            </div>
+
+                            <div class="turn-indicator">
+                                <div class="turn-count" id="battle-turn-count">TURN 1</div>
+                                <div class="turn-active-arrow" id="turn-active-arrow">➡️</div>
+                            </div>
+
+                            <div class="arena-player-card" id="arena-opponent">
+                                <div class="player-meta">
+                                    <span class="player-label">OPPONENT AI</span>
+                                    <span class="arena-job-name" id="arena-opponent-job">주식투자자</span>
+                                </div>
+                                <div class="hp-bar-wrapper">
+                                    <div class="hp-bar-fill" id="opponent-hp-bar" style="width: 100%;"></div>
+                                    <span class="hp-text" id="opponent-hp-text">목숨: 3 / 3</span>
+                                </div>
+                                <div class="debuff-tray" id="opponent-debuff-tray"></div>
+                            </div>
+                        </div>
+
+                        <!-- Battle Logs -->
+                        <div class="battle-logs-wrapper">
+                            <h5>📜 실시간 배틀 로그</h5>
+                            <div class="battle-log-screen" id="battle-log-screen">
+                                <div class="log-row sys">⚔️ 게임이 시작되었습니다. 첫 단어를 입력해 주세요!</div>
+                            </div>
+                        </div>
+
+                        <!-- Input actions -->
+                        <div class="battle-input-area">
+                            <div class="input-prefix-label" id="battle-input-prefix">시작글자:</div>
+                            <input type="text" id="battle-word-input" placeholder="여기에 대결 단어를 입력하고 Enter를 누르세요..." autocomplete="off">
+                            <button id="battle-submit-btn" class="action-btn">제출</button>
+                        </div>
+                        <div class="battle-actions-row">
+                            <button class="action-btn danger" id="giveup-battle-btn">🏳️ 기권하기</button>
+                            <div class="battle-tips" id="battle-helper-tip">💡 팁: 한방 끝글자로 끝나는 단어를 설계해 보세요.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Job Codex Area (Initially Hidden) -->
+                <div class="job-codex-container hidden" id="job-codex-panel">
+                    <div class="job-grid-layout" id="job-codex-grid">
+                        <!-- Job cards will be dynamically injected here -->
+                    </div>
                 </div>
                 
                 <!-- Load More Button Wrapper -->
@@ -163,6 +267,19 @@
         </span>
         <span id="fab-text">분석기</span>
     </button>
+
+    <!-- Job Selection Modal -->
+    <div id="job-selection-modal" class="modal-overlay hidden">
+        <div class="modal-content glass-panel">
+            <div class="modal-header">
+                <h3>🎭 플레이어 직업 선택</h3>
+                <button class="close-modal-btn" id="close-job-modal-btn">&times;</button>
+            </div>
+            <div class="job-options-list" id="modal-job-options">
+                <!-- Dynamically injected job choice cards -->
+            </div>
+        </div>
+    </div>
 
     <script src="app.js"></script>
 </body>

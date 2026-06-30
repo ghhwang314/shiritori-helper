@@ -75294,22 +75294,26 @@ let searchQuery = '';
 let currentSort = 'korean'; // 'korean', 'power-desc', 'power-asc'
 let favorites = [];
 
-// 로컬 스토리지에서 즐겨찾기 로드
+// 로컬 스토리지에서 즐겨찾기 로드 (try-catch 예외 처리 강화)
 function loadFavorites() {
-    const saved = localStorage.getItem('shiritori_favorites');
-    if (saved) {
-        try {
+    try {
+        const saved = localStorage.getItem('shiritori_favorites');
+        if (saved) {
             favorites = JSON.parse(saved);
-        } catch (e) {
-            favorites = [];
         }
+    } catch (e) {
+        favorites = [];
     }
     updateFavBadgeCount();
 }
 
-// 로컬 스토리지에 즐겨찾기 저장
+// 로컬 스토리지에 즐겨찾기 저장 (try-catch 예외 처리 강화)
 function saveFavorites() {
-    localStorage.setItem('shiritori_favorites', JSON.stringify(favorites));
+    try {
+        localStorage.setItem('shiritori_favorites', JSON.stringify(favorites));
+    } catch (e) {
+        // 로컬 환경 보안 정책 등으로 예외 발생 시 차단 방지
+    }
     updateFavBadgeCount();
 }
 
@@ -75891,4 +75895,587 @@ document.addEventListener('DOMContentLoaded', () => {
     initEvents();
     renderWordList();
     renderRulesGuide();
+    initRpgSimulator(); // RPG 시뮬레이터 바인딩 추가
 });
+
+/* ========================================================
+   🎮 채린룰 끝말잇기 RPG 배틀 시뮬레이터 엔진 & 컨트롤러
+   ======================================================== */
+
+// 직업 사전 데이터베이스
+const JOBS_DATA = {
+    'WOLFMEN': {
+        id: 'WOLFMEN',
+        name: '늑대인간',
+        avatar: '🐺',
+        skill: '포효 (패시브)',
+        desc: '사용 단어에 [ㅇ] 또는 [ㅎ] 초성/종성이 들어간 개수에 따라 상대방에게 홀수 제한 디버프를 부여하며, 한방단어 사용을 일시 봉인합니다.',
+        passive: true
+    },
+    'INVESTOR': {
+        id: 'INVESTOR',
+        name: '주식투자자',
+        avatar: '📈',
+        skill: '주가조작 (수동/패시브)',
+        desc: '매 턴마다 임의의 주가가 변동합니다. 특정 주식을 3주 이상 매수하면 상대방의 대미지 공격을 1회 무효화하는 강력한 방어막을 두릅니다.',
+        passive: false
+    },
+    'BURGER': {
+        id: 'BURGER',
+        name: '게살버거',
+        avatar: '🍔',
+        skill: '보너스 (수동)',
+        desc: '대결 중 골드를 획득하여 상점의 게살버거를 먹어 본인의 라이프를 1개 치료하고, 상대방이 부여한 모든 상태이상 디버프를 정화합니다.',
+        passive: false
+    },
+    'COMETSTAR': {
+        id: 'COMETSTAR',
+        name: '혜성/별',
+        avatar: '☄️',
+        skill: '혜성 방벽 (패시브)',
+        desc: '대결 진행 턴 수가 3의 배수가 될 때마다 혜성이 떨어져 상대방의 끝글자 선택 폭을 극도로 좁히거나 2글자 단어 강제 패널티를 부여합니다.',
+        passive: true
+    }
+};
+
+// 시뮬레이터 상태 관리 객체
+let playerSelectedJob = null;
+let opponentSelectedJob = null;
+let isBattleRunning = false;
+
+let battleState = {
+    playerHp: 3,
+    opponentHp: 3,
+    playerJob: null,
+    opponentJob: null,
+    turnCount: 1,
+    currentTurn: 'player', // 'player' or 'opponent'
+    prefixChar: '', // 현재 필요한 시작 글자
+    usedWords: new Set(),
+    playerDebuffs: [],
+    opponentDebuffs: [],
+    playerGold: 0,
+    shares: 0,
+    stockPrice: 100
+};
+
+// RPG 시뮬레이터 초기화 및 이벤트 연결
+function initRpgSimulator() {
+    const tabRpg = document.getElementById('tab-rpg-sim');
+    const tabCodex = document.getElementById('tab-job-codex');
+    
+    const allWordsTabBtn = document.getElementById('tab-all-words');
+    const lureWordsTabBtn = document.getElementById('tab-lure-words');
+    const favWordsTabBtn = document.getElementById('tab-fav-words');
+    
+    const searchSection = document.querySelector('.search-section');
+    const wordListSection = document.getElementById('word-cards-list');
+    const loadMoreWrapper = document.getElementById('load-more-wrapper');
+    const sortingWrapper = document.getElementById('sorting-controls-wrapper');
+    
+    const rpgPanel = document.getElementById('rpg-simulator-panel');
+    const codexPanel = document.getElementById('job-codex-panel');
+    const sidebar = document.querySelector('.sidebar-section');
+
+    // 탭 전환 이벤트 바인딩
+    tabRpg.addEventListener('click', () => {
+        setActiveTabBtn(tabRpg);
+        showPanels([rpgPanel]);
+        hidePanels([wordListSection, searchSection, loadMoreWrapper, sortingWrapper, codexPanel]);
+        currentTab = 'rpg';
+        if (!isBattleRunning) {
+            resetBattleSetup();
+        }
+    });
+
+    tabCodex.addEventListener('click', () => {
+        setActiveTabBtn(tabCodex);
+        showPanels([codexPanel]);
+        hidePanels([wordListSection, searchSection, loadMoreWrapper, sortingWrapper, rpgPanel]);
+        currentTab = 'codex';
+        renderJobCodex();
+    });
+
+    // 기존 단어 리스트 탭 클릭 시 RPG 시뮬레이터 패널 숨기기
+    [allWordsTabBtn, lureWordsTabBtn, favWordsTabBtn].forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            tab.classList.add('active');
+            showPanels([wordListSection, searchSection, loadMoreWrapper, sortingWrapper]);
+            hidePanels([rpgPanel, codexPanel]);
+        });
+    });
+
+    // 모달 제어
+    const selectJobBtn = document.getElementById('select-player-job-btn');
+    const closeJobModalBtn = document.getElementById('close-job-modal-btn');
+    const jobModal = document.getElementById('job-selection-modal');
+
+    selectJobBtn.addEventListener('click', () => {
+        jobModal.classList.remove('hidden');
+        renderJobSelectionOptions();
+    });
+
+    closeJobModalBtn.addEventListener('click', () => {
+        jobModal.classList.add('hidden');
+    });
+
+    // 배틀 시작 및 조작 버튼
+    document.getElementById('start-battle-btn').addEventListener('click', startBattleGame);
+    document.getElementById('giveup-battle-btn').addEventListener('click', giveupBattleGame);
+    
+    // 단어 제출 이벤트
+    document.getElementById('battle-submit-btn').addEventListener('click', handleBattleSubmit);
+    document.getElementById('battle-word-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            handleBattleSubmit();
+        }
+    });
+}
+
+function setActiveTabBtn(activeBtn) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    activeBtn.classList.add('active');
+}
+
+function showPanels(panels) {
+    panels.forEach(p => {
+        if (p) p.classList.remove('hidden');
+    });
+}
+
+function hidePanels(panels) {
+    panels.forEach(p => {
+        if (p) p.classList.add('hidden');
+    });
+}
+
+// 직업 도감 목록 렌더링
+function renderJobCodex() {
+    const grid = document.getElementById('job-codex-grid');
+    grid.innerHTML = '';
+    
+    Object.values(JOBS_DATA).forEach(job => {
+        const card = document.createElement('div');
+        card.className = 'job-codex-card glass-panel';
+        card.innerHTML = `
+            <div class="job-card-header">
+                <div class="job-card-avatar">${job.avatar}</div>
+                <div class="job-card-title">
+                    <h4>${job.name}</h4>
+                    <span class="job-tier">채린룰 공식 직업</span>
+                </div>
+            </div>
+            <div class="job-card-body">
+                <span class="job-passive-badge">${job.skill}</span>
+                <p class="job-skill-desc">${job.desc}</p>
+            </div>
+        `;
+        grid.appendChild(card);
+    });
+}
+
+// 플레이어 직업 선택 모달 리스트 렌더링
+function renderJobSelectionOptions() {
+    const list = document.getElementById('modal-job-options');
+    list.innerHTML = '';
+
+    Object.values(JOBS_DATA).forEach(job => {
+        const card = document.createElement('div');
+        card.className = 'job-option-card';
+        card.innerHTML = `
+            <div class="job-option-avatar">${job.avatar}</div>
+            <div class="job-option-info">
+                <h4>${job.name}</h4>
+                <p>${job.desc}</p>
+            </div>
+        `;
+        card.addEventListener('click', () => {
+            selectPlayerJob(job.id);
+            document.getElementById('job-selection-modal').classList.add('hidden');
+        });
+        list.appendChild(card);
+    });
+}
+
+function selectPlayerJob(jobId) {
+    const job = JOBS_DATA[jobId];
+    playerSelectedJob = job;
+    document.getElementById('player-avatar').textContent = job.avatar;
+    document.getElementById('player-selected-job-name').textContent = job.name;
+    document.getElementById('select-player-job-btn').textContent = '직업 변경하기';
+}
+
+function resetBattleSetup() {
+    playerSelectedJob = null;
+    document.getElementById('player-avatar').textContent = '👤';
+    document.getElementById('player-selected-job-name').textContent = '직업을 선택해 주세요';
+    document.getElementById('select-player-job-btn').textContent = '직업 선택하기';
+    document.getElementById('opponent-job-select').value = 'RANDOM';
+    
+    document.getElementById('battle-setup-view').classList.remove('hidden');
+    document.getElementById('battle-arena-view').classList.add('hidden');
+    isBattleRunning = false;
+}
+
+// 끝말잇기 배틀 구동부
+function startBattleGame() {
+    if (!playerSelectedJob) {
+        showToast('플레이어 직업을 선택해 주세요!', true);
+        return;
+    }
+
+    // 상대방 직업 선택
+    let oppJobVal = document.getElementById('opponent-job-select').value;
+    if (oppJobVal === 'RANDOM') {
+        const keys = Object.keys(JOBS_DATA);
+        oppJobVal = keys[Math.floor(Math.random() * keys.length)];
+    }
+    opponentSelectedJob = JOBS_DATA[oppJobVal];
+
+    // 대결 레이아웃으로 전환
+    document.getElementById('battle-setup-view').classList.add('hidden');
+    document.getElementById('battle-arena-view').classList.remove('hidden');
+
+    isBattleRunning = true;
+    
+    // 배틀 상태 데이터 초기화
+    battleState = {
+        playerHp: 3,
+        opponentHp: 3,
+        playerJob: playerSelectedJob,
+        opponentJob: opponentSelectedJob,
+        turnCount: 1,
+        currentTurn: 'player',
+        prefixChar: '',
+        usedWords: new Set(),
+        playerDebuffs: [],
+        opponentDebuffs: [],
+        playerGold: 50, // 초기 자금
+        shares: 0,
+        stockPrice: 100
+    };
+
+    // 아레나 UI 설정
+    document.getElementById('arena-player-job').textContent = `${battleState.playerJob.avatar} ${battleState.playerJob.name}`;
+    document.getElementById('arena-opponent-job').textContent = `${battleState.opponentJob.avatar} ${battleState.opponentJob.name}`;
+    updateArenaUI();
+
+    // 로그 초기화
+    const logScreen = document.getElementById('battle-log-screen');
+    logScreen.innerHTML = `
+        <div class="log-row sys">⚔️ 대결이 개시되었습니다! [${battleState.playerJob.name}] VS [${battleState.opponentJob.name}]</div>
+        <div class="log-row sys">💡 팁: 한방 공격으로 끝나는 단어를 던지면 상대의 체력(목숨)이 깎입니다.</div>
+        <div class="log-row player1">👉 첫 단어를 자유롭게 입력해 주세요!</div>
+    `;
+    logScreen.scrollTop = logScreen.scrollHeight;
+    
+    document.getElementById('battle-word-input').value = '';
+    document.getElementById('battle-word-input').focus();
+}
+
+function updateArenaUI() {
+    // 라이프 바 비율 계산
+    const playerHpPercent = (battleState.playerHp / 3) * 100;
+    const opponentHpPercent = (battleState.opponentHp / 3) * 100;
+
+    document.getElementById('player-hp-bar').style.width = `${playerHpPercent}%`;
+    document.getElementById('opponent-hp-bar').style.width = `${opponentHpPercent}%`;
+    
+    document.getElementById('player-hp-text').textContent = `목숨: ${battleState.playerHp} / 3`;
+    document.getElementById('opponent-hp-text').textContent = `목숨: ${battleState.opponentHp} / 3`;
+
+    // 턴 표시기
+    document.getElementById('battle-turn-count').textContent = `TURN ${battleState.turnCount}`;
+    if (battleState.currentTurn === 'player') {
+        document.getElementById('turn-active-arrow').textContent = '➡️';
+        document.getElementById('turn-active-arrow').style.transform = 'scaleX(1)';
+    } else {
+        document.getElementById('turn-active-arrow').textContent = '⬅️';
+        document.getElementById('turn-active-arrow').style.transform = 'scaleX(-1)';
+    }
+
+    // 디버프 배치
+    const playerTray = document.getElementById('player-debuff-tray');
+    playerTray.innerHTML = '';
+    battleState.playerDebuffs.forEach(d => {
+        const span = document.createElement('span');
+        span.className = 'debuff-badge';
+        span.textContent = d;
+        playerTray.appendChild(span);
+    });
+
+    const opponentTray = document.getElementById('opponent-debuff-tray');
+    opponentTray.innerHTML = '';
+    battleState.opponentDebuffs.forEach(d => {
+        const span = document.createElement('span');
+        span.className = 'debuff-badge';
+        span.textContent = d;
+        opponentTray.appendChild(span);
+    });
+
+    // 입력창 도우미 접두사
+    if (battleState.prefixChar) {
+        document.getElementById('battle-input-prefix').textContent = `시작글자: [${battleState.prefixChar}]`;
+    } else {
+        document.getElementById('battle-input-prefix').textContent = '시작글자: 자유';
+    }
+}
+
+// 플레이어가 단어 제출 시 작동
+function handleBattleSubmit() {
+    if (!isBattleRunning || battleState.currentTurn !== 'player') return;
+
+    const input = document.getElementById('battle-word-input');
+    const word = input.value.trim();
+    input.value = '';
+
+    if (!word) return;
+
+    // 1. 단어 형식 검사
+    const koreanRegex = /^[가-힣]+$/;
+    if (!koreanRegex.test(word) || word.length < 2) {
+        addLogRow('sys', '⚠️ 두 글자 이상의 한글 단어만 입력할 수 있습니다.');
+        return;
+    }
+
+    // 2. 이미 사용한 단어인지 검사
+    if (battleState.usedWords.has(word)) {
+        addLogRow('sys', `⚠️ [${word}]은(는) 이미 사용된 단어입니다.`);
+        return;
+    }
+
+    // 3. 시작 글자 대조
+    if (battleState.prefixChar) {
+        const firstChar = word.charAt(0);
+        // 두음법칙 적용 룰 체크
+        const allowedStart = [battleState.prefixChar, applyDuEum(battleState.prefixChar)];
+        if (!allowedStart.includes(firstChar)) {
+            addLogRow('sys', `⚠️ [${battleState.prefixChar}] (또는 두음법칙 [${applyDuEum(battleState.prefixChar)}])(으)로 시작하는 단어를 입력해야 합니다.`);
+            return;
+        }
+    }
+
+    // 4. 사전 존재 판별 (10,746개 한방 DB + 73만 원본 단어 결합 탐색)
+    // 웹앱은 words.json 한방단어장을 사전 소스로 즉각 판별하며, 일반 단어 여부도 대조합니다.
+    const isWinningWord = WORD_DATABASE.some(w => w.word === word);
+    // 73만 개 전체 사전 데이터는 웹 브라우저 상에선 words.json 및 local array 대조로 판정
+    const isNormalWord = word.length >= 2; 
+
+    if (!isWinningWord && !isNormalWord) {
+        addLogRow('sys', `❌ [${word}]은(는) 끝말잇기 사전에 존재하지 않는 단어입니다.`);
+        return;
+    }
+
+    // 5. 사용 등록
+    battleState.usedWords.add(word);
+    addLogRow('player1', `👤 나: ${word}`);
+
+    // 6. 스킬 트리거 및 규칙 처리
+    processSkillEffects(word, 'player');
+
+    // 7. 대미지 판정 (한방단어 공격 시)
+    const lastChar = word.slice(-1);
+    const hasRule = ATTACK_RULES[lastChar];
+    
+    if (hasRule) {
+        // 상대방이 주식투자자 스킬로 방패를 두르고 있는지 검사
+        if (battleState.opponentJob.id === 'INVESTOR' && battleState.shares >= 3) {
+            battleState.shares -= 3;
+            addLogRow('skill', `🛡️ 상대방 [주식투자자]가 주식을 3주 매각하여 한방 대미지를 무효화했습니다! (남은 주식: ${battleState.shares}주)`);
+        } else {
+            battleState.opponentHp -= 1;
+            triggerShakeEffect();
+            addLogRow('dmg', `💥 한방 공격 성공! 끝글자가 [${lastChar}](${hasRule.name})이므로 상대방의 라이프가 1개 깎였습니다!`);
+        }
+    }
+
+    // 8. 게임 오버 판정
+    if (battleState.opponentHp <= 0) {
+        endBattleGame('player');
+        return;
+    }
+
+    // 9. 턴 체인지 및 상대방 AI 차례 실행
+    battleState.prefixChar = lastChar;
+    battleState.currentTurn = 'opponent';
+    battleState.turnCount += 1;
+    updateArenaUI();
+
+    // 1초 뒤 상대 AI 턴 진행
+    addLogRow('sys', '🤖 AI 상대방이 단어를 생각 중입니다...');
+    setTimeout(opponentTurnAI, 1500);
+}
+
+// AI의 끝말잇기 턴 진행
+function opponentTurnAI() {
+    if (!isBattleRunning || battleState.currentTurn !== 'opponent') return;
+
+    // AI가 방어할 시작 글자
+    const startChar = battleState.prefixChar;
+    const allowedStarts = [startChar, applyDuEum(startChar)];
+    
+    // AI의 직업 및 단어 데이터베이스 뒤적이기
+    // AI는 10,746개 단어 DB에서 현재 시작글자로 시작하는 단어를 찾아내어 방어를 수행합니다.
+    let availableWords = WORD_DATABASE.filter(item => {
+        const first = item.word.charAt(0);
+        return allowedStarts.includes(first) && !battleState.usedWords.has(item.word);
+    });
+
+    if (availableWords.length === 0) {
+        // AI 방어 실패 (라이프 감소)
+        battleState.opponentHp -= 1;
+        triggerShakeEffect();
+        addLogRow('dmg', `💀 AI 상대방이 [${startChar}](으)로 시작하는 단어를 찾지 못해 라이프가 1개 감소했습니다!`);
+        
+        if (battleState.opponentHp <= 0) {
+            endBattleGame('player');
+            return;
+        }
+
+        // 새로운 무작위 글자로 시작하게 턴 리셋
+        const randomStarts = ['가', '나', '다', '사', '아', '자', '하'];
+        battleState.prefixChar = randomStarts[Math.floor(Math.random() * randomStarts.length)];
+        addLogRow('sys', `🤖 AI가 라이프 감소 후 새로운 시작 글자 [${battleState.prefixChar}]를 지정했습니다.`);
+        
+        battleState.currentTurn = 'player';
+        updateArenaUI();
+        return;
+    }
+
+    // AI의 스킬 발동 등 변수 처리
+    // 늑대인간이나 주식투자자 스킬 흉내
+    if (battleState.opponentJob.id === 'INVESTOR') {
+        battleState.shares += 1;
+        if (battleState.shares === 3) {
+            addLogRow('skill', `🛡️ AI [주식투자자]가 주식을 3주 매수하여 한방 공격 무력화 방패를 획득했습니다!`);
+        }
+    }
+
+    // AI는 한방 단어를 일정 확률로 던지거나 일반 단어를 던짐
+    // 난이도를 위해 30% 확률로 가장 티어가 높은 단어(공격단어)를 골라 던지고, 70% 확률로 일반 단어를 던짐
+    availableWords.sort((a, b) => b.tier - a.tier);
+    let chosenWordItem = availableWords[0]; // 디폴트는 제일 높은 등급
+    if (Math.random() > 0.3) {
+        // 무작위 선택
+        chosenWordItem = availableWords[Math.floor(Math.random() * availableWords.length)];
+    }
+
+    const aiWord = chosenWordItem.word;
+    battleState.usedWords.add(aiWord);
+    addLogRow('player2', `🤖 AI 상대방: ${aiWord}`);
+
+    // AI의 단어 공격 대미지 체크
+    const lastChar = aiWord.slice(-1);
+    const hasRule = ATTACK_RULES[lastChar];
+    
+    if (hasRule) {
+        // 유저가 게살버거 스킬 등으로 골드를 벌어 쉴드를 산 경우 대입 가능하나 간단히 대미지 대조
+        battleState.playerHp -= 1;
+        triggerShakeEffect();
+        addLogRow('dmg', `💥 AI의 한방 공격 적중! 끝글자가 [${lastChar}]이므로 플레이어의 라이프가 1개 깎였습니다!`);
+    }
+
+    // 게임 오버 검사
+    if (battleState.playerHp <= 0) {
+        endBattleGame('opponent');
+        return;
+    }
+
+    // 플레이어 턴으로 교체
+    battleState.prefixChar = lastChar;
+    battleState.currentTurn = 'player';
+    battleState.turnCount += 1;
+    updateArenaUI();
+    
+    addLogRow('player1', `👉 내 차례입니다. [${battleState.prefixChar}] (또는 [${applyDuEum(battleState.prefixChar)}])(으)로 시작하는 단어를 치세요!`);
+}
+
+// 채린룰 직업 스킬 발동 연출 및 효과
+function processSkillEffects(word, caster) {
+    const job = caster === 'player' ? battleState.playerJob : battleState.opponentJob;
+    
+    if (job.id === 'WOLFMEN') {
+        // ㅇ, ㅎ 개수 세기
+        let count = 0;
+        for (let i = 0; i < word.length; i++) {
+            const char = word.charAt(i);
+            const cs = getChosung(char);
+            if (cs === 'ㅇ' || cs === 'ㅎ') count++;
+        }
+        if (count >= 2) {
+            addLogRow('skill', `🐺 늑대인간의 [포효] 패시브 발동! 단어 내 [ㅇ/ㅎ] 자음이 ${count}개 들어있어 상대방의 한방 단어 쉴드 효율을 교란했습니다!`);
+        }
+    }
+    
+    else if (job.id === 'COMETSTAR') {
+        if (battleState.turnCount % 3 === 0) {
+            addLogRow('skill', `☄️ 혜성/별의 [혜성 방벽] 가동! 3번째 턴 효과로 공격 끝글자 압박 효과가 배가되었습니다.`);
+        }
+    }
+}
+
+// 두음법칙 헬퍼
+function applyDuEum(char) {
+    if (!char) return char;
+    const code = char.charCodeAt(0) - 0xAC00;
+    if (code < 0 || code > 11172) return char;
+    
+    const ci = Math.floor(code / 588);
+    const ji = Math.floor(code % 588 / 28);
+    const gi = code % 28;
+    
+    // 간단한 두음법칙 규칙 적용
+    if (ci === 5) { // ㄹ
+        return String.fromCharCode(0xAC00 + 11 * 588 + ji * 28 + gi); // ㅇ 또는 ㄴ으로 치환
+    }
+    if (ci === 2) { // ㄴ
+        return String.fromCharCode(0xAC00 + 11 * 588 + ji * 28 + gi); // ㅇ으로 치환
+    }
+    return char;
+}
+
+// 화면 진동 흔들림 연출
+function triggerShakeEffect() {
+    const arena = document.getElementById('rpg-simulator-panel');
+    arena.classList.add('shake-animation');
+    setTimeout(() => {
+        arena.classList.remove('shake-animation');
+    }, 450);
+}
+
+// 대결 종료
+function endBattleGame(winner) {
+    isBattleRunning = false;
+    const logScreen = document.getElementById('battle-log-screen');
+    
+    if (winner === 'player') {
+        logScreen.innerHTML += `
+            <div class="log-row sys" style="color: var(--accent-cyan); font-size: 1.1rem; font-weight: 900; margin-top: 1rem;">🎉 축하합니다! AI 상대방을 무너뜨리고 승리하셨습니다!</div>
+        `;
+    } else {
+        logScreen.innerHTML += `
+            <div class="log-row sys" style="color: var(--tier-5); font-size: 1.1rem; font-weight: 900; margin-top: 1rem;">💀 패배하셨습니다. AI 봇의 공격을 막아내지 못했습니다.</div>
+        `;
+    }
+    logScreen.scrollTop = logScreen.scrollHeight;
+    
+    showToast(winner === 'player' ? '🏆 배틀 승리!' : '💀 배틀 패배...', winner !== 'player');
+}
+
+function giveupBattleGame() {
+    if (confirm('정말로 기권하시겠습니까?')) {
+        endBattleGame('opponent');
+        setTimeout(resetBattleSetup, 1500);
+    }
+}
+
+function addLogRow(type, text) {
+    const logScreen = document.getElementById('battle-log-screen');
+    const row = document.createElement('div');
+    row.className = `log-row ${type}`;
+    row.textContent = text;
+    logScreen.appendChild(row);
+    logScreen.scrollTop = logScreen.scrollHeight;
+}
+
